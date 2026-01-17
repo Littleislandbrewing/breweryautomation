@@ -1,0 +1,256 @@
+alias: "NB: MASHOUT: 4: Vorlauf Mash Process"
+description: >-
+  V2.1 - Vorlauf mash pump sequence with wort pump mutex flag, works standalone
+  or called by parent
+triggers:
+  - entity_id: input_boolean.prc_vorlauf_mash
+    to: "on"
+    id: start
+    trigger: state
+  - entity_id: input_boolean.prc_vorlauf_mash
+    to: "off"
+    id: stop
+    trigger: state
+actions:
+  - choose:
+      - conditions:
+          - condition: trigger
+            id: start
+        sequence:
+          - action: input_boolean.turn_off
+            target:
+              entity_id: input_boolean.prc_vorlauf_mash_complete
+          - action: system_log.write
+            data:
+              message: "VORLAUF: Start triggered"
+              level: warning
+          - variables:
+              i_acquired_flag: >-
+                {{ is_state('input_boolean.prc_wort_pump_process_in_progress',
+                'off') }}
+          - if:
+              - condition: template
+                value_template: "{{ i_acquired_flag }}"
+            then:
+              - action: system_log.write
+                data:
+                  message: >-
+                    VORLAUF: Flag available - acquiring wort pump mutex flag
+                    (standalone mode)
+                  level: warning
+              - wait_template: >-
+                  {{ is_state('input_boolean.prc_wort_pump_process_in_progress',
+                  'off') }}
+                timeout:
+                  seconds: 30
+              - action: input_boolean.turn_on
+                target:
+                  entity_id: input_boolean.prc_wort_pump_process_in_progress
+            else:
+              - action: system_log.write
+                data:
+                  message: >-
+                    VORLAUF: Flag already held by parent - proceeding without
+                    acquiring (called by controller)
+                  level: warning
+          - action: system_log.write
+            data:
+              message: "VORLAUF: Turning off dependent process booleans"
+              level: warning
+          - action: input_boolean.turn_off
+            target:
+              entity_id: input_boolean.prc_pre_sparge
+          - action: input_boolean.turn_off
+            target:
+              entity_id: input_boolean.prc_prime_wort_pump
+          - action: system_log.write
+            data:
+              message: "VORLAUF: Starting timer"
+              level: warning
+          - action: timer.start
+            target:
+              entity_id: timer.prc_vorlauf_mash
+            data:
+              duration: >-
+                {{ (states('input_number.prc_vorlauf_duration') | int(0)) +
+                (states('input_number.prc_wort_pump_spindown_duration') |
+                int(0)) + 5 }}
+          - action: system_log.write
+            data:
+              message: "VORLAUF: Executing process p014"
+              level: warning
+          - action: pyscript.execute_process
+            data:
+              process_name: p014
+          - action: system_log.write
+            data:
+              message: "VORLAUF: Waiting 5 seconds for valve engagement"
+              level: warning
+          - delay:
+              seconds: 5
+          - action: system_log.write
+            data:
+              message: "VORLAUF: Setting wort pump speed and turning on"
+              level: warning
+          - action: input_number.set_value
+            target:
+              entity_id: input_number.prc_wort_pump_speed
+            data:
+              value: "{{ states('input_number.prc_vorlauf_pump_speed') | int(0) }}"
+          - action: input_boolean.turn_on
+            target:
+              entity_id: input_boolean.prc_wort_pump
+          - action: system_log.write
+            data:
+              message: "VORLAUF: Running for configured duration"
+              level: warning
+          - delay:
+              seconds: "{{ states('input_number.prc_vorlauf_duration') | int(0) }}"
+          - action: system_log.write
+            data:
+              message: "VORLAUF: Duration complete, turning off wort pump"
+              level: warning
+          - action: input_boolean.turn_off
+            target:
+              entity_id: input_boolean.prc_wort_pump
+          - action: system_log.write
+            data:
+              message: "VORLAUF: Waiting for wort pump spindown"
+              level: warning
+          - delay:
+              seconds: >-
+                {{ states('input_number.prc_wort_pump_spindown_duration') |
+                int(0) }}
+          - action: system_log.write
+            data:
+              message: "VORLAUF: Resetting all valves"
+              level: warning
+          - action: pyscript.reset_all_valves
+          - action: system_log.write
+            data:
+              message: "VORLAUF: Cancelling timer"
+              level: warning
+          - action: timer.cancel
+            target:
+              entity_id: timer.prc_vorlauf_mash
+          - action: system_log.write
+            data:
+              message: "VORLAUF: Setting completion flag"
+              level: warning
+          - action: input_boolean.turn_on
+            target:
+              entity_id: input_boolean.prc_vorlauf_mash_complete
+          - action: system_log.write
+            data:
+              message: "VORLAUF: Turning off process boolean"
+              level: warning
+          - action: input_boolean.turn_off
+            target:
+              entity_id: input_boolean.prc_vorlauf_mash
+          - if:
+              - condition: template
+                value_template: "{{ i_acquired_flag }}"
+            then:
+              - action: system_log.write
+                data:
+                  message: "VORLAUF: Releasing wort pump mutex flag (standalone mode)"
+                  level: warning
+              - action: input_boolean.turn_off
+                target:
+                  entity_id: input_boolean.prc_wort_pump_process_in_progress
+            else:
+              - action: system_log.write
+                data:
+                  message: >-
+                    VORLAUF: Not releasing flag - parent still holds it (called
+                    by controller)
+                  level: warning
+          - action: system_log.write
+            data:
+              message: "VORLAUF: Process complete"
+              level: warning
+      - conditions:
+          - condition: trigger
+            id: stop
+          - condition: state
+            entity_id: input_boolean.prc_vorlauf_mash_complete
+            state: "off"
+        sequence:
+          - action: system_log.write
+            data:
+              message: "VORLAUF: ABORT - Emergency cleanup triggered"
+              level: warning
+          - variables:
+              i_acquired_flag: >-
+                {{ is_state('input_boolean.prc_wort_pump_process_in_progress',
+                'off') }}
+          - if:
+              - condition: template
+                value_template: "{{ i_acquired_flag }}"
+            then:
+              - action: system_log.write
+                data:
+                  message: >-
+                    VORLAUF: Acquiring wort pump mutex flag for cleanup
+                    (standalone mode)
+                  level: warning
+              - action: input_boolean.turn_on
+                target:
+                  entity_id: input_boolean.prc_wort_pump_process_in_progress
+            else:
+              - action: system_log.write
+                data:
+                  message: >-
+                    VORLAUF: Flag already held - proceeding with cleanup (called
+                    by controller)
+                  level: warning
+          - action: system_log.write
+            data:
+              message: "VORLAUF: Cancelling timer"
+              level: warning
+          - action: timer.cancel
+            target:
+              entity_id: timer.prc_vorlauf_mash
+          - action: system_log.write
+            data:
+              message: "VORLAUF: Turning off wort pump"
+              level: warning
+          - action: input_boolean.turn_off
+            target:
+              entity_id: input_boolean.prc_wort_pump
+          - action: system_log.write
+            data:
+              message: "VORLAUF: Waiting for wort pump spindown"
+              level: warning
+          - delay:
+              seconds: >-
+                {{ states('input_number.prc_wort_pump_spindown_duration') |
+                int(0) }}
+          - action: system_log.write
+            data:
+              message: "VORLAUF: Resetting all valves"
+              level: warning
+          - action: pyscript.reset_all_valves
+          - if:
+              - condition: template
+                value_template: "{{ i_acquired_flag }}"
+            then:
+              - action: system_log.write
+                data:
+                  message: "VORLAUF: Releasing wort pump mutex flag (standalone mode)"
+                  level: warning
+              - action: input_boolean.turn_off
+                target:
+                  entity_id: input_boolean.prc_wort_pump_process_in_progress
+            else:
+              - action: system_log.write
+                data:
+                  message: >-
+                    VORLAUF: Not releasing flag - parent still holds it (called
+                    by controller)
+                  level: warning
+          - action: system_log.write
+            data:
+              message: "VORLAUF: Emergency cleanup complete"
+              level: warning
+mode: restart
