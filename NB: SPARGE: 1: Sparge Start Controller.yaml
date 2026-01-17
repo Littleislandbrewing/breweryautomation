@@ -1,0 +1,148 @@
+alias: "NB: SPARGE: 1: Sparge Start Controller"
+description: V4.2 - Main controller for sparge process with fixed template syntax
+triggers:
+  - entity_id: input_boolean.prc_sparge_start
+    to: "on"
+    trigger: state
+  - entity_id: input_boolean.prc_sparge_start
+    to: "off"
+    trigger: state
+actions:
+  - choose:
+      - conditions:
+          - condition: state
+            entity_id: input_boolean.prc_sparge_start
+            state: "on"
+        sequence:
+          - action: input_boolean.turn_off
+            target:
+              entity_id: input_boolean.prc_sparge_start_complete
+          - action: system_log.write
+            data:
+              message: "SPARGE CONTROLLER: Cancelling mashout if active"
+          - action: input_boolean.turn_off
+            target:
+              entity_id: input_boolean.prc_mashout_start
+          - delay:
+              seconds: 2
+          - action: system_log.write
+            data:
+              message: "SPARGE: Starting Add Water"
+          - action: input_boolean.turn_off
+            target:
+              entity_id: input_boolean.prc_sparge_add_water_complete
+          - action: input_boolean.turn_on
+            target:
+              entity_id: input_boolean.prc_sparge_add_water
+          - wait_for_trigger:
+              - entity_id: input_boolean.prc_sparge_add_water
+                to: "off"
+                trigger: state
+          - choose:
+              - conditions:
+                  - condition: state
+                    entity_id: input_boolean.prc_sparge_add_water_complete
+                    state: "on"
+                sequence:
+                  - action: system_log.write
+                    data:
+                      message: "SPARGE: Add Water Complete. Auto-starting Prime Grant."
+                  - action: input_boolean.turn_off
+                    target:
+                      entity_id: input_boolean.prc_sparge_prime_grant_complete
+                  - action: input_boolean.turn_on
+                    target:
+                      entity_id: input_boolean.prc_sparge_prime_grant
+              - conditions:
+                  - condition: state
+                    entity_id: input_boolean.prc_sparge_add_water_complete
+                    state: "off"
+                sequence:
+                  - action: system_log.write
+                    data:
+                      message: >-
+                        SPARGE: Add Water Stopped Manually. PAUSED. Waiting for
+                        user to start Prime Grant.
+                      level: warning
+                  - wait_for_trigger:
+                      - entity_id: input_boolean.prc_sparge_prime_grant
+                        to: "on"
+                        trigger: state
+                  - action: system_log.write
+                    data:
+                      message: >-
+                        SPARGE: Manual Resume Detected. Tracking Prime Grant
+                        Process.
+          - wait_for_trigger:
+              - entity_id: input_boolean.prc_sparge_prime_grant
+                to: "off"
+                trigger: state
+          - choose:
+              - conditions:
+                  - condition: state
+                    entity_id: input_boolean.prc_sparge_prime_grant_complete
+                    state: "on"
+                sequence:
+                  - action: system_log.write
+                    data:
+                      message: "SPARGE: Prime Grant Complete. Auto-starting Runoff."
+                  - action: input_boolean.turn_off
+                    target:
+                      entity_id: input_boolean.prc_sparge_runoff_complete
+                  - action: input_boolean.turn_on
+                    target:
+                      entity_id: input_boolean.prc_sparge_runoff
+              - conditions:
+                  - condition: state
+                    entity_id: input_boolean.prc_sparge_prime_grant_complete
+                    state: "off"
+                sequence:
+                  - action: system_log.write
+                    data:
+                      message: >-
+                        SPARGE: Prime Grant Stopped Manually. PAUSED. Waiting
+                        for user to start Runoff.
+                      level: warning
+                  - wait_for_trigger:
+                      - entity_id: input_boolean.prc_sparge_runoff
+                        to: "on"
+                        trigger: state
+                  - action: system_log.write
+                    data:
+                      message: "SPARGE: Manual Resume Detected. Tracking Runoff."
+          - wait_for_trigger:
+              - entity_id: input_boolean.prc_sparge_runoff
+                to: "off"
+                trigger: state
+          - action: system_log.write
+            data:
+              message: "SPARGE CONTROLLER: Sequence Finished"
+              level: warning
+          - action: input_boolean.turn_on
+            target:
+              entity_id: input_boolean.prc_sparge_start_complete
+          - action: input_boolean.turn_off
+            target:
+              entity_id: input_boolean.prc_sparge_start
+      - conditions:
+          - condition: state
+            entity_id: input_boolean.prc_sparge_start
+            state: "off"
+        sequence:
+          - action: system_log.write
+            data:
+              message: "SPARGE CONTROLLER: Master Switch Off - Stopping All"
+          - action: input_boolean.turn_off
+            target:
+              entity_id:
+                - input_boolean.prc_sparge_add_water
+                - input_boolean.prc_sparge_prime_grant
+                - input_boolean.prc_sparge_runoff
+          - delay:
+              seconds: >-
+                {{ states('input_number.prc_valve_transit_delay') | int(5) + 2
+                }}
+          - action: system_log.write
+            data:
+              message: "SPARGE CONTROLLER: System Safe and Stopped."
+mode: restart
