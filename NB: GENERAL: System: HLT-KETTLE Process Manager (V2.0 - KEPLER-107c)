@@ -1,0 +1,137 @@
+alias: "NB: GENERAL: System: HLT/KETTLE Process Manager (V2.0 - KEPLER-107c)"
+description: >-
+  V2.0: KEPLER-107c CORE. Watchdog monitoring, continuous mode fixed, abort
+  checks throughout.
+mode: restart
+fields:
+  process_id:
+    description: p004
+  pump_boolean:
+    description: input_boolean.hlt_pump
+  speed_entity:
+    description: input_number.hlt_speed
+  pump_speed:
+    description: "5000"
+  duration:
+    description: Seconds (0=Continuous)
+  controlling_boolean:
+    description: The boolean that triggered this
+sequence:
+  - action: system_log.write
+    data:
+      message: >-
+        🚀 [KEPLER] EXEC: {{ process_id }} | P: {{ pump_boolean }} | T: {{
+        duration }}s | CTRL: {{ controlling_boolean }}
+      level: info
+  - variables:
+      duration_s: "{{ duration | int(0) }}"
+  - if:
+      - condition: template
+        value_template: "{{ not is_state(controlling_boolean, 'on') }}"
+    then:
+      - action: system_log.write
+        data:
+          message: "🚫 [KEPLER] ABORT: Control boolean not ON at start"
+          level: warning
+      - stop: "Aborted: controlling_boolean not ON at start"
+  - if:
+      - condition: template
+        value_template: |
+          {{ is_state('pyscript.global_in_progress', 'on')
+             or is_state('input_boolean.hlt_pump', 'on')
+             or is_state('input_boolean.wort_pump', 'on') }}
+    then:
+      - action: system_log.write
+        data:
+          message: 🧹 [KEPLER] System Dirty - Running Safety Wipe
+          level: warning
+      - action: script.nb_0000_god_mode_system_shutdown_safe_reset
+    else:
+      - action: system_log.write
+        data:
+          message: ✨ [KEPLER] System Clean - Instant Launch
+          level: info
+  - action: pyscript.execute_process
+    data:
+      process_name: "{{ process_id }}"
+  - action: input_number.set_value
+    target:
+      entity_id: "{{ speed_entity }}"
+    data:
+      value: "{{ pump_speed }}"
+  - delay:
+      seconds: "{{ states('input_number.prc_valve_transit_delay_open') | float(2) }}"
+  - if:
+      - condition: template
+        value_template: "{{ not is_state(controlling_boolean, 'on') }}"
+    then:
+      - action: system_log.write
+        data:
+          message: "🚫 [KEPLER] ABORT: Switch turned off during valve transit"
+          level: warning
+      - action: script.nb_0000_god_mode_system_shutdown_safe_reset
+      - stop: Aborted during transit
+  - action: input_boolean.turn_on
+    target:
+      entity_id: "{{ pump_boolean }}"
+  - if:
+      - condition: template
+        value_template: "{{ not is_state(controlling_boolean, 'on') }}"
+    then:
+      - action: system_log.write
+        data:
+          message: "🚫 [KEPLER] ABORT: Switch turned off at pump start"
+          level: warning
+      - action: script.nb_0000_god_mode_system_shutdown_safe_reset
+      - stop: Aborted at pump start
+  - choose:
+      - conditions:
+          - condition: template
+            value_template: "{{ duration_s > 0 }}"
+        sequence:
+          - action: system_log.write
+            data:
+              message: >-
+                ⏳ [KEPLER] TIMER: Started {{ duration_s }}s watchdog loop (1s
+                polling)
+              level: info
+          - repeat:
+              while:
+                - condition: template
+                  value_template: >-
+                    {{ is_state(controlling_boolean, 'on') and repeat.index <=
+                    duration_s }}
+              sequence:
+                - delay: 1
+          - if:
+              - condition: template
+                value_template: "{{ not is_state(controlling_boolean, 'on') }}"
+            then:
+              - action: system_log.write
+                data:
+                  message: >-
+                    🚫 [KEPLER] ABORT: Switch turned off during timed run -
+                    executing shutdown
+                  level: warning
+              - action: script.nb_0000_god_mode_system_shutdown_safe_reset
+              - stop: Aborted during timed run
+            else:
+              - action: system_log.write
+                data:
+                  message: ⏳ [KEPLER] Timer Expired - Auto-Stop
+                  level: info
+              - action: input_boolean.turn_off
+                target:
+                  entity_id: "{{ controlling_boolean }}"
+              - action: script.nb_0000_god_mode_system_shutdown_safe_reset
+    default:
+      - action: system_log.write
+        data:
+          message: "♾️ [KEPLER] CONTINUOUS: Duration=0 - Waiting for switch OFF"
+          level: info
+      - wait_template: "{{ not is_state(controlling_boolean, 'on') }}"
+      - action: system_log.write
+        data:
+          message: "🛑 [KEPLER] CONTINUOUS: Switch OFF detected - executing shutdown"
+          level: warning
+      - action: script.nb_0000_god_mode_system_shutdown_safe_reset
