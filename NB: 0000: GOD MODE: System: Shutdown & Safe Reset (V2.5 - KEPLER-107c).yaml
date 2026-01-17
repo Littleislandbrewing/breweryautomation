@@ -1,0 +1,77 @@
+alias: "NB: 0000: GOD MODE: System: Shutdown & Safe Reset (V2.5 - KEPLER-107c)"
+description: >-
+  V2.5: Intelligent sequential pump shutdown. Wort first, then CLT/HLT.
+  Universal cleanup.
+mode: queued
+max: 10
+max_exceeded: warning
+sequence:
+  - action: system_log.write
+    data:
+      message: "🛑 [KEPLER] CRITICAL: Shutdown Sequence Initiated"
+      level: warning
+  - if:
+      - condition: state
+        entity_id: input_boolean.prc_wort_pump
+        state: "on"
+    then:
+      - action: input_boolean.turn_off
+        target:
+          entity_id: input_boolean.prc_wort_pump
+      - action: system_log.write
+        data:
+          message: ⏳ [KEPLER] Wort pump OFF - waiting for spindown
+          level: warning
+      - delay:
+          seconds: >-
+            {{ states('input_number.prc_wort_pump_spindown_duration') | int(8)
+            }}
+  - if:
+      - condition: state
+        entity_id: input_boolean.clt_pump
+        state: "on"
+    then:
+      - action: input_boolean.turn_off
+        target:
+          entity_id: input_boolean.clt_pump
+      - action: system_log.write
+        data:
+          message: ⏳ [KEPLER] CLT pump OFF - waiting for spindown
+          level: warning
+      - delay:
+          seconds: "{{ states('input_number.prc_clt_pump_spindown_duration') | int(8) }}"
+  - if:
+      - condition: state
+        entity_id: input_boolean.hlt_pump
+        state: "on"
+    then:
+      - action: input_boolean.turn_off
+        target:
+          entity_id: input_boolean.hlt_pump
+      - action: system_log.write
+        data:
+          message: ⏳ [KEPLER] HLT pump OFF - waiting for spindown
+          level: warning
+      - delay:
+          seconds: "{{ states('input_number.prc_hlt_pump_spindown_duration') | int(5) }}"
+  - action: pyscript.reset_all_valves
+  - action: system_log.write
+    data:
+      message: 🔄 [KEPLER] Valve reset initiated - waiting for completion
+      level: warning
+  - wait_template: "{{ is_state('pyscript.global_in_progress', 'off') }}"
+    timeout: "00:00:30"
+    continue_on_timeout: true
+  - if:
+      - condition: template
+        value_template: "{{ wait.completed }}"
+    then:
+      - action: system_log.write
+        data:
+          message: "✅ [KEPLER] SECURE: System Safe - global_in_progress cleared"
+          level: info
+    else:
+      - action: system_log.write
+        data:
+          message: "⚠️ [KEPLER] WARNING: 30s timeout - global_in_progress still ON"
+          level: error
