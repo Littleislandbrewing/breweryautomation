@@ -1,0 +1,41 @@
+alias: "NB: GENERAL: RAKES: Rake Motor Mutex Controller (V1.0)"
+description: Ensures only one rake motor direction can be active at a time
+triggers:
+  - trigger: state
+    entity_id:
+      - input_boolean.rakes_motor_fwd
+      - input_boolean.rakes_motor_bwd
+      - input_boolean.rakes_motor_agitate
+    to: "on"
+actions:
+  - variables:
+      triggered_motor: "{{ trigger.entity_id }}"
+      all_motors:
+        - input_boolean.rakes_motor_fwd
+        - input_boolean.rakes_motor_bwd
+        - input_boolean.rakes_motor_agitate
+  - action: system_log.write
+    data:
+      message: "RAKE MUTEX: {{ triggered_motor }} turned ON - turning off others"
+      level: warning
+  - repeat:
+      for_each: "{{ all_motors }}"
+      sequence:
+        - if:
+            - condition: template
+              value_template: "{{ repeat.item != triggered_motor }}"
+            - condition: template
+              value_template: "{{ is_state(repeat.item, 'on') }}"
+          then:
+            - action: system_log.write
+              data:
+                message: "RAKE MUTEX: Turning off {{ repeat.item }}"
+                level: warning
+            - target:
+                entity_id: "{{ repeat.item }}"
+              action: input_boolean.turn_off
+  - action: system_log.write
+    data:
+      message: "RAKE MUTEX: Complete - {{ triggered_motor }} is sole active motor"
+      level: warning
+mode: restart
