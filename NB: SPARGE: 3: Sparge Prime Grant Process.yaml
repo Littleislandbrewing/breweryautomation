@@ -1,0 +1,68 @@
+alias: "NB: SPARGE: 3: Sparge Prime Grant Process"
+description: Prime grant and wort pump while continuing sparge - p025 (RIGID v2.0)
+triggers:
+  - entity_id: input_boolean.prc_sparge_prime_grant
+    to: "on"
+    id: start
+    trigger: state
+  - entity_id: input_boolean.prc_sparge_prime_grant
+    to: "off"
+    id: stop
+    trigger: state
+actions:
+  - choose:
+      - conditions:
+          - condition: trigger
+            id: start
+        sequence:
+          - target:
+              entity_id: input_boolean.prc_sparge_prime_grant_complete
+            action: input_boolean.turn_off
+          - action: system_log.write
+            data:
+              message: "SPARGE PRIME GRANT: Start sequence initiated"
+              level: warning
+          - action: timer.start
+            target:
+              entity_id: timer.prc_sparge_prime_grant
+            data:
+              duration: >-
+                {{ (states('input_number.prc_prime_wort_pump_duration') | int) +
+                2 }}
+          - action: pyscript.execute_process
+            data:
+              process_name: p025
+          - delay:
+              seconds: 2
+          - delay:
+              seconds: "{{ states('input_number.prc_prime_wort_pump_duration') | int }}"
+          - action: pyscript.reset_all_valves
+          - action: timer.cancel
+            target:
+              entity_id: timer.prc_sparge_prime_grant
+          - target:
+              entity_id: input_boolean.prc_sparge_prime_grant_complete
+            action: input_boolean.turn_on
+          - action: system_log.write
+            data:
+              message: "SPARGE PRIME GRANT: Process completed successfully"
+              level: warning
+          - target:
+              entity_id: input_boolean.prc_sparge_prime_grant
+            action: input_boolean.turn_off
+      - conditions:
+          - condition: trigger
+            id: stop
+          - condition: state
+            entity_id: input_boolean.prc_sparge_prime_grant_complete
+            state: "off"
+        sequence:
+          - action: system_log.write
+            data:
+              message: "SPARGE PRIME GRANT: ABORT - Emergency cleanup"
+              level: warning
+          - action: timer.cancel
+            target:
+              entity_id: timer.prc_sparge_prime_grant
+          - action: pyscript.reset_all_valves
+mode: restart
