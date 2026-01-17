@@ -1,0 +1,402 @@
+alias: "NB: SAPRGE: 4:Sparge Runoff Process"
+description: V2.1 - Runoff mash to kettle with dual pump mutex flags and queued mode
+triggers:
+  - entity_id: input_boolean.prc_sparge_runoff
+    to: "on"
+    id: start
+    trigger: state
+  - entity_id: input_boolean.prc_sparge_runoff
+    to: "off"
+    id: stop
+    trigger: state
+actions:
+  - choose:
+      - conditions:
+          - condition: trigger
+            id: start
+        sequence:
+          - action: input_boolean.turn_off
+            target:
+              entity_id: input_boolean.prc_sparge_runoff_complete
+          - action: system_log.write
+            data:
+              message: "SPARGE RUNOFF: Start triggered"
+              level: warning
+          - variables:
+              i_acquired_hlt_flag: >-
+                {{ is_state('input_boolean.prc_hlt_pump_process_in_progress',
+                'off') }}
+              i_acquired_wort_flag: >-
+                {{ is_state('input_boolean.prc_wort_pump_process_in_progress',
+                'off') }}
+          - if:
+              - condition: template
+                value_template: "{{ i_acquired_hlt_flag }}"
+            then:
+              - action: system_log.write
+                data:
+                  message: "SPARGE RUNOFF: Acquiring HLT pump mutex flag"
+                  level: warning
+              - wait_template: >-
+                  {{ is_state('input_boolean.prc_hlt_pump_process_in_progress',
+                  'off') }}
+                timeout:
+                  seconds: 30
+              - action: input_boolean.turn_on
+                target:
+                  entity_id: input_boolean.prc_hlt_pump_process_in_progress
+            else:
+              - action: system_log.write
+                data:
+                  message: "SPARGE RUNOFF: HLT flag already held by parent"
+                  level: warning
+          - if:
+              - condition: template
+                value_template: "{{ i_acquired_wort_flag }}"
+            then:
+              - action: system_log.write
+                data:
+                  message: "SPARGE RUNOFF: Acquiring Wort pump mutex flag"
+                  level: warning
+              - wait_template: >-
+                  {{ is_state('input_boolean.prc_wort_pump_process_in_progress',
+                  'off') }}
+                timeout:
+                  seconds: 30
+              - action: input_boolean.turn_on
+                target:
+                  entity_id: input_boolean.prc_wort_pump_process_in_progress
+            else:
+              - action: system_log.write
+                data:
+                  message: "SPARGE RUNOFF: Wort flag already held by parent"
+                  level: warning
+          - action: system_log.write
+            data:
+              message: "SPARGE RUNOFF: Phase 1 - With Sparge (p026)"
+              level: warning
+          - action: timer.start
+            target:
+              entity_id: timer.prc_sparge_runoff
+            data:
+              duration: 70
+          - action: system_log.write
+            data:
+              message: "SPARGE RUNOFF: Executing process p026"
+              level: warning
+          - action: pyscript.execute_process
+            data:
+              process_name: p026
+          - action: system_log.write
+            data:
+              message: "SPARGE RUNOFF: Waiting 2 seconds for valve engagement"
+              level: warning
+          - delay:
+              seconds: 2
+          - action: system_log.write
+            data:
+              message: "SPARGE RUNOFF: Starting HLT pump at 750 RPM"
+              level: warning
+          - action: input_number.set_value
+            target:
+              entity_id: input_number.hlt_speed
+            data:
+              value: 750
+          - action: input_boolean.turn_on
+            target:
+              entity_id: input_boolean.hlt_pump
+          - action: system_log.write
+            data:
+              message: "SPARGE RUNOFF: Starting Wort pump at 750 RPM"
+              level: warning
+          - action: input_number.set_value
+            target:
+              entity_id: input_number.prc_wort_pump_speed
+            data:
+              value: 750
+          - action: input_boolean.turn_on
+            target:
+              entity_id: input_boolean.prc_wort_pump
+          - action: system_log.write
+            data:
+              message: "SPARGE RUNOFF: Waiting 10 seconds before opening valve 12"
+              level: warning
+          - delay:
+              seconds: 10
+          - action: system_log.write
+            data:
+              message: "SPARGE RUNOFF: Opening valve 12"
+              level: warning
+          - action: pyscript.manual_valve_control
+            data:
+              valve_id: "12"
+              state: open
+          - action: system_log.write
+            data:
+              message: "SPARGE RUNOFF: Phase 1 running for 60 seconds"
+              level: warning
+          - delay:
+              seconds: 60
+          - action: system_log.write
+            data:
+              message: "SPARGE RUNOFF: Phase 1 complete, stopping HLT pump"
+              level: warning
+          - action: input_boolean.turn_off
+            target:
+              entity_id: input_boolean.hlt_pump
+          - action: system_log.write
+            data:
+              message: "SPARGE RUNOFF: Waiting for HLT pump spindown"
+              level: warning
+          - delay:
+              seconds: >-
+                {{ states('input_number.prc_hlt_pump_spindown_duration') |
+                int(0) }}
+          - if:
+              - condition: template
+                value_template: "{{ i_acquired_hlt_flag }}"
+            then:
+              - action: system_log.write
+                data:
+                  message: >-
+                    SPARGE RUNOFF: Releasing HLT pump mutex flag (Phase 1
+                    complete)
+                  level: warning
+              - action: input_boolean.turn_off
+                target:
+                  entity_id: input_boolean.prc_hlt_pump_process_in_progress
+            else:
+              - action: system_log.write
+                data:
+                  message: "SPARGE RUNOFF: Not releasing HLT flag - held by parent"
+                  level: warning
+          - action: system_log.write
+            data:
+              message: "SPARGE RUNOFF: Phase 2 - No Sparge (p027)"
+              level: warning
+          - action: pyscript.reset_all_valves
+          - action: system_log.write
+            data:
+              message: "SPARGE RUNOFF: Waiting 2 seconds for valve reset"
+              level: warning
+          - delay:
+              seconds: 2
+          - action: system_log.write
+            data:
+              message: "SPARGE RUNOFF: Executing process p027"
+              level: warning
+          - action: pyscript.execute_process
+            data:
+              process_name: p027
+          - action: system_log.write
+            data:
+              message: "SPARGE RUNOFF: Waiting 2 seconds for valve engagement"
+              level: warning
+          - delay:
+              seconds: 2
+          - action: system_log.write
+            data:
+              message: "SPARGE RUNOFF: Starting Wort pump for Phase 2"
+              level: warning
+          - action: input_boolean.turn_on
+            target:
+              entity_id: input_boolean.prc_wort_pump
+          - action: timer.cancel
+            target:
+              entity_id: timer.prc_sparge_runoff
+          - action: system_log.write
+            data:
+              message: "SPARGE RUNOFF: Phase 2 running - waiting for manual stop"
+              level: warning
+          - wait_for_trigger:
+              - entity_id: input_boolean.prc_sparge_runoff
+                to: "off"
+                trigger: state
+          - action: system_log.write
+            data:
+              message: "SPARGE RUNOFF: Manual stop detected, stopping Wort pump"
+              level: warning
+          - action: input_boolean.turn_off
+            target:
+              entity_id: input_boolean.prc_wort_pump
+          - action: system_log.write
+            data:
+              message: "SPARGE RUNOFF: Waiting for Wort pump spindown"
+              level: warning
+          - delay:
+              seconds: >-
+                {{ states('input_number.prc_wort_pump_spindown_duration') |
+                int(0) }}
+          - action: system_log.write
+            data:
+              message: "SPARGE RUNOFF: Resetting all valves"
+              level: warning
+          - action: pyscript.reset_all_valves
+          - if:
+              - condition: template
+                value_template: "{{ i_acquired_wort_flag }}"
+            then:
+              - action: system_log.write
+                data:
+                  message: "SPARGE RUNOFF: Releasing Wort pump mutex flag"
+                  level: warning
+              - action: input_boolean.turn_off
+                target:
+                  entity_id: input_boolean.prc_wort_pump_process_in_progress
+            else:
+              - action: system_log.write
+                data:
+                  message: "SPARGE RUNOFF: Not releasing Wort flag - held by parent"
+                  level: warning
+          - action: system_log.write
+            data:
+              message: "SPARGE RUNOFF: Setting completion flag"
+              level: warning
+          - action: input_boolean.turn_on
+            target:
+              entity_id: input_boolean.prc_sparge_runoff_complete
+          - action: system_log.write
+            data:
+              message: "SPARGE RUNOFF: Turning off process boolean"
+              level: warning
+          - action: input_boolean.turn_off
+            target:
+              entity_id: input_boolean.prc_sparge_runoff
+          - action: system_log.write
+            data:
+              message: "SPARGE RUNOFF: Process completed successfully"
+              level: warning
+      - conditions:
+          - condition: trigger
+            id: stop
+          - condition: state
+            entity_id: input_boolean.prc_sparge_runoff_complete
+            state: "off"
+        sequence:
+          - action: system_log.write
+            data:
+              message: "SPARGE RUNOFF: ABORT - Emergency cleanup triggered"
+              level: warning
+          - variables:
+              i_acquired_hlt_flag: >-
+                {{ is_state('input_boolean.prc_hlt_pump_process_in_progress',
+                'off') }}
+              i_acquired_wort_flag: >-
+                {{ is_state('input_boolean.prc_wort_pump_process_in_progress',
+                'off') }}
+          - if:
+              - condition: template
+                value_template: "{{ i_acquired_hlt_flag }}"
+            then:
+              - action: system_log.write
+                data:
+                  message: "SPARGE RUNOFF: Acquiring HLT pump mutex flag for cleanup"
+                  level: warning
+              - action: input_boolean.turn_on
+                target:
+                  entity_id: input_boolean.prc_hlt_pump_process_in_progress
+            else:
+              - action: system_log.write
+                data:
+                  message: >-
+                    SPARGE RUNOFF: HLT flag already held - proceeding with
+                    cleanup
+                  level: warning
+          - if:
+              - condition: template
+                value_template: "{{ i_acquired_wort_flag }}"
+            then:
+              - action: system_log.write
+                data:
+                  message: "SPARGE RUNOFF: Acquiring Wort pump mutex flag for cleanup"
+                  level: warning
+              - action: input_boolean.turn_on
+                target:
+                  entity_id: input_boolean.prc_wort_pump_process_in_progress
+            else:
+              - action: system_log.write
+                data:
+                  message: >-
+                    SPARGE RUNOFF: Wort flag already held - proceeding with
+                    cleanup
+                  level: warning
+          - action: system_log.write
+            data:
+              message: "SPARGE RUNOFF: Cancelling timer"
+              level: warning
+          - action: timer.cancel
+            target:
+              entity_id: timer.prc_sparge_runoff
+          - action: system_log.write
+            data:
+              message: "SPARGE RUNOFF: Turning off HLT pump"
+              level: warning
+          - action: input_boolean.turn_off
+            target:
+              entity_id: input_boolean.hlt_pump
+          - action: system_log.write
+            data:
+              message: "SPARGE RUNOFF: Waiting for HLT pump spindown"
+              level: warning
+          - delay:
+              seconds: >-
+                {{ states('input_number.prc_hlt_pump_spindown_duration') |
+                int(0) }}
+          - action: system_log.write
+            data:
+              message: "SPARGE RUNOFF: Turning off Wort pump"
+              level: warning
+          - action: input_boolean.turn_off
+            target:
+              entity_id: input_boolean.prc_wort_pump
+          - action: system_log.write
+            data:
+              message: "SPARGE RUNOFF: Waiting for Wort pump spindown"
+              level: warning
+          - delay:
+              seconds: >-
+                {{ states('input_number.prc_wort_pump_spindown_duration') |
+                int(0) }}
+          - action: system_log.write
+            data:
+              message: "SPARGE RUNOFF: Resetting all valves"
+              level: warning
+          - action: pyscript.reset_all_valves
+          - if:
+              - condition: template
+                value_template: "{{ i_acquired_hlt_flag }}"
+            then:
+              - action: system_log.write
+                data:
+                  message: "SPARGE RUNOFF: Releasing HLT pump mutex flag"
+                  level: warning
+              - action: input_boolean.turn_off
+                target:
+                  entity_id: input_boolean.prc_hlt_pump_process_in_progress
+            else:
+              - action: system_log.write
+                data:
+                  message: "SPARGE RUNOFF: Not releasing HLT flag - held by parent"
+                  level: warning
+          - if:
+              - condition: template
+                value_template: "{{ i_acquired_wort_flag }}"
+            then:
+              - action: system_log.write
+                data:
+                  message: "SPARGE RUNOFF: Releasing Wort pump mutex flag"
+                  level: warning
+              - action: input_boolean.turn_off
+                target:
+                  entity_id: input_boolean.prc_wort_pump_process_in_progress
+            else:
+              - action: system_log.write
+                data:
+                  message: "SPARGE RUNOFF: Not releasing Wort flag - held by parent"
+                  level: warning
+          - action: system_log.write
+            data:
+              message: "SPARGE RUNOFF: Emergency cleanup complete"
+              level: warning
+mode: queued
+max: 3
