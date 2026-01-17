@@ -1,0 +1,284 @@
+alias: "NB: GENERAL: 1: HLT RECIRC Process (V3.0)"
+description: >-
+  V3.0 - KEPLER-107C COMPLIANCE: Removed all off triggers, mode restart, manual
+  mutex checking, and pre-cleanup calls. GOD MODE now handles process mutual
+  exclusion and cleanup. Hardware mutex retained for pump safety only.
+triggers:
+  - entity_id: input_boolean.prc_recirc_hlt
+    to: "on"
+    id: start
+    trigger: state
+  - entity_id: input_boolean.prc_recirc_hlt_5m
+    to: "on"
+    id: start_5m
+    trigger: state
+  - entity_id: input_boolean.prc_recirc_hlt_2m
+    to: "on"
+    id: start_2m
+    trigger: state
+actions:
+  - choose:
+      - conditions:
+          - condition: trigger
+            id: start
+        sequence:
+          - action: system_log.write
+            data:
+              message: "HLT RECIRC: Continuous mode start triggered"
+              level: warning
+          - action: system_log.write
+            data:
+              message: "HLT RECIRC: Waiting for hardware mutex flag to be released"
+              level: warning
+          - wait_template: >-
+              {{ is_state('input_boolean.prc_hlt_pump_process_in_progress',
+              'off') }}
+            timeout:
+              seconds: 30
+          - action: system_log.write
+            data:
+              message: "HLT RECIRC: Acquiring hardware mutex flag"
+              level: warning
+          - action: input_boolean.turn_on
+            target:
+              entity_id: input_boolean.prc_hlt_pump_process_in_progress
+          - action: system_log.write
+            data:
+              message: "HLT RECIRC: Executing process p004"
+              level: warning
+          - action: pyscript.execute_process
+            data:
+              process_name: p004
+          - action: system_log.write
+            data:
+              message: "HLT RECIRC: Waiting 3 seconds for valve engagement"
+              level: warning
+          - delay:
+              seconds: 3
+          - action: system_log.write
+            data:
+              message: "HLT RECIRC: Setting HLT pump speed to 5000"
+              level: warning
+          - action: input_number.set_value
+            target:
+              entity_id: input_number.hlt_speed
+            data:
+              value: 5000
+          - action: system_log.write
+            data:
+              message: "HLT RECIRC: Turning on HLT pump (continuous mode)"
+              level: warning
+          - action: input_boolean.turn_on
+            target:
+              entity_id: input_boolean.hlt_pump
+          - action: system_log.write
+            data:
+              message: "HLT RECIRC: Continuous mode running, hardware mutex flag held"
+              level: warning
+      - conditions:
+          - condition: trigger
+            id: start_5m
+        sequence:
+          - action: system_log.write
+            data:
+              message: "HLT RECIRC 5M: 5-minute mode start triggered"
+              level: warning
+          - action: system_log.write
+            data:
+              message: "HLT RECIRC 5M: Waiting for hardware mutex flag to be released"
+              level: warning
+          - wait_template: >-
+              {{ is_state('input_boolean.prc_hlt_pump_process_in_progress',
+              'off') }}
+            timeout:
+              seconds: 30
+          - action: system_log.write
+            data:
+              message: "HLT RECIRC 5M: Acquiring hardware mutex flag"
+              level: warning
+          - action: input_boolean.turn_on
+            target:
+              entity_id: input_boolean.prc_hlt_pump_process_in_progress
+          - action: system_log.write
+            data:
+              message: "HLT RECIRC 5M: Executing process p028"
+              level: warning
+          - action: pyscript.execute_process
+            data:
+              process_name: p028
+          - action: system_log.write
+            data:
+              message: "HLT RECIRC 5M: Waiting 3 seconds for valve engagement"
+              level: warning
+          - delay:
+              seconds: 3
+          - action: system_log.write
+            data:
+              message: "HLT RECIRC 5M: Setting HLT pump speed to 5000"
+              level: warning
+          - action: input_number.set_value
+            target:
+              entity_id: input_number.hlt_speed
+            data:
+              value: 5000
+          - action: system_log.write
+            data:
+              message: "HLT RECIRC 5M: Turning on HLT pump"
+              level: warning
+          - action: input_boolean.turn_on
+            target:
+              entity_id: input_boolean.hlt_pump
+          - action: system_log.write
+            data:
+              message: "HLT RECIRC 5M: Running for 300 seconds"
+              level: warning
+          - delay:
+              seconds: 300
+          - action: system_log.write
+            data:
+              message: "HLT RECIRC 5M: Timer complete, turning off boolean FIRST"
+              level: warning
+          - action: input_boolean.turn_off
+            target:
+              entity_id: input_boolean.prc_recirc_hlt_5m
+          - action: system_log.write
+            data:
+              message: "HLT RECIRC 5M: Stopping pump"
+              level: warning
+          - action: input_boolean.turn_off
+            target:
+              entity_id: input_boolean.hlt_pump
+          - action: system_log.write
+            data:
+              message: "HLT RECIRC 5M: Waiting for pump spindown"
+              level: warning
+          - delay:
+              seconds: >-
+                {{ states('input_number.prc_hlt_pump_spindown_duration') |
+                int(0) }}
+          - action: system_log.write
+            data:
+              message: "HLT RECIRC 5M: Resetting all valves"
+              level: warning
+          - action: pyscript.reset_all_valves
+          - action: system_log.write
+            data:
+              message: "HLT RECIRC 5M: Waiting for valve transit"
+              level: warning
+          - delay:
+              seconds: "{{ states('input_number.prc_valve_transit_delay') | int(0) }}"
+          - action: system_log.write
+            data:
+              message: "HLT RECIRC 5M: Releasing hardware mutex flag"
+              level: warning
+          - action: input_boolean.turn_off
+            target:
+              entity_id: input_boolean.prc_hlt_pump_process_in_progress
+          - action: system_log.write
+            data:
+              message: "HLT RECIRC 5M: Auto-complete sequence finished"
+              level: warning
+      - conditions:
+          - condition: trigger
+            id: start_2m
+        sequence:
+          - action: system_log.write
+            data:
+              message: "HLT RECIRC 2M: 2-minute mode start triggered"
+              level: warning
+          - action: system_log.write
+            data:
+              message: "HLT RECIRC 2M: Waiting for hardware mutex flag to be released"
+              level: warning
+          - wait_template: >-
+              {{ is_state('input_boolean.prc_hlt_pump_process_in_progress',
+              'off') }}
+            timeout:
+              seconds: 30
+          - action: system_log.write
+            data:
+              message: "HLT RECIRC 2M: Acquiring hardware mutex flag"
+              level: warning
+          - action: input_boolean.turn_on
+            target:
+              entity_id: input_boolean.prc_hlt_pump_process_in_progress
+          - action: system_log.write
+            data:
+              message: "HLT RECIRC 2M: Executing process p029"
+              level: warning
+          - action: pyscript.execute_process
+            data:
+              process_name: p029
+          - action: system_log.write
+            data:
+              message: "HLT RECIRC 2M: Waiting 3 seconds for valve engagement"
+              level: warning
+          - delay:
+              seconds: 3
+          - action: system_log.write
+            data:
+              message: "HLT RECIRC 2M: Setting HLT pump speed to 5000"
+              level: warning
+          - action: input_number.set_value
+            target:
+              entity_id: input_number.hlt_speed
+            data:
+              value: 5000
+          - action: system_log.write
+            data:
+              message: "HLT RECIRC 2M: Turning on HLT pump"
+              level: warning
+          - action: input_boolean.turn_on
+            target:
+              entity_id: input_boolean.hlt_pump
+          - action: system_log.write
+            data:
+              message: "HLT RECIRC 2M: Running for 120 seconds"
+              level: warning
+          - delay:
+              seconds: 120
+          - action: system_log.write
+            data:
+              message: "HLT RECIRC 2M: Timer complete, turning off boolean FIRST"
+              level: warning
+          - action: input_boolean.turn_off
+            target:
+              entity_id: input_boolean.prc_recirc_hlt_2m
+          - action: system_log.write
+            data:
+              message: "HLT RECIRC 2M: Stopping pump"
+              level: warning
+          - action: input_boolean.turn_off
+            target:
+              entity_id: input_boolean.hlt_pump
+          - action: system_log.write
+            data:
+              message: "HLT RECIRC 2M: Waiting for pump spindown"
+              level: warning
+          - delay:
+              seconds: >-
+                {{ states('input_number.prc_hlt_pump_spindown_duration') |
+                int(0) }}
+          - action: system_log.write
+            data:
+              message: "HLT RECIRC 2M: Resetting all valves"
+              level: warning
+          - action: pyscript.reset_all_valves
+          - action: system_log.write
+            data:
+              message: "HLT RECIRC 2M: Waiting for valve transit"
+              level: warning
+          - delay:
+              seconds: "{{ states('input_number.prc_valve_transit_delay') | int(0) }}"
+          - action: system_log.write
+            data:
+              message: "HLT RECIRC 2M: Releasing hardware mutex flag"
+              level: warning
+          - action: input_boolean.turn_off
+            target:
+              entity_id: input_boolean.prc_hlt_pump_process_in_progress
+          - action: system_log.write
+            data:
+              message: "HLT RECIRC 2M: Auto-complete sequence finished"
+              level: warning
+mode: single
