@@ -1,0 +1,138 @@
+alias: "NB: SPARGE: 2: Sparge Add Water Process"
+description: V2.1 - Add water to mash tun with HLT pump mutex flag
+triggers:
+  - entity_id: input_boolean.prc_sparge_add_water
+    to: "on"
+    id: start
+    trigger: state
+  - entity_id: input_boolean.prc_sparge_add_water
+    to: "off"
+    id: stop
+    trigger: state
+actions:
+  - choose:
+      - conditions:
+          - condition: trigger
+            id: start
+        sequence:
+          - action: input_boolean.turn_off
+            target:
+              entity_id: input_boolean.prc_sparge_add_water_complete
+          - action: system_log.write
+            data:
+              message: "SPARGE ADD WATER: Start triggered"
+              level: warning
+          - variables:
+              i_acquired_flag: >-
+                {{ is_state('input_boolean.prc_hlt_pump_process_in_progress',
+                'off') }}
+          - if:
+              - condition: template
+                value_template: "{{ i_acquired_flag }}"
+            then:
+              - action: system_log.write
+                data:
+                  message: "SPARGE ADD WATER: Acquiring HLT pump mutex flag"
+                  level: warning
+              - wait_template: >-
+                  {{ is_state('input_boolean.prc_hlt_pump_process_in_progress',
+                  'off') }}
+                timeout:
+                  seconds: 30
+              - action: input_boolean.turn_on
+                target:
+                  entity_id: input_boolean.prc_hlt_pump_process_in_progress
+            else:
+              - action: system_log.write
+                data:
+                  message: "SPARGE ADD WATER: Flag held by parent"
+                  level: warning
+          - action: timer.start
+            target:
+              entity_id: timer.prc_sparge_add_water
+            data:
+              duration: 40
+          - action: pyscript.execute_process
+            data:
+              process_name: p024
+          - delay:
+              seconds: 2
+          - action: input_number.set_value
+            target:
+              entity_id: input_number.hlt_speed
+            data:
+              value: 5000
+          - action: input_boolean.turn_on
+            target:
+              entity_id: input_boolean.hlt_pump
+          - delay:
+              seconds: 30
+          - action: input_boolean.turn_off
+            target:
+              entity_id: input_boolean.hlt_pump
+          - delay:
+              seconds: >-
+                {{ states('input_number.prc_hlt_pump_spindown_duration') |
+                int(0) }}
+          - action: pyscript.reset_all_valves
+          - action: timer.cancel
+            target:
+              entity_id: timer.prc_sparge_add_water
+          - action: input_boolean.turn_on
+            target:
+              entity_id: input_boolean.prc_sparge_add_water_complete
+          - action: input_boolean.turn_off
+            target:
+              entity_id: input_boolean.prc_sparge_add_water
+          - if:
+              - condition: template
+                value_template: "{{ i_acquired_flag }}"
+            then:
+              - action: input_boolean.turn_off
+                target:
+                  entity_id: input_boolean.prc_hlt_pump_process_in_progress
+          - action: system_log.write
+            data:
+              message: "SPARGE ADD WATER: Complete"
+              level: warning
+      - conditions:
+          - condition: trigger
+            id: stop
+          - condition: state
+            entity_id: input_boolean.prc_sparge_add_water_complete
+            state: "off"
+        sequence:
+          - action: system_log.write
+            data:
+              message: "SPARGE ADD WATER: ABORT"
+              level: warning
+          - variables:
+              i_acquired_flag: >-
+                {{ is_state('input_boolean.prc_hlt_pump_process_in_progress',
+                'off') }}
+          - if:
+              - condition: template
+                value_template: "{{ i_acquired_flag }}"
+            then:
+              - action: input_boolean.turn_on
+                target:
+                  entity_id: input_boolean.prc_hlt_pump_process_in_progress
+          - action: timer.cancel
+            target:
+              entity_id: timer.prc_sparge_add_water
+          - action: input_boolean.turn_off
+            target:
+              entity_id: input_boolean.hlt_pump
+          - delay:
+              seconds: >-
+                {{ states('input_number.prc_hlt_pump_spindown_duration') |
+                int(0) }}
+          - action: pyscript.reset_all_valves
+          - if:
+              - condition: template
+                value_template: "{{ i_acquired_flag }}"
+            then:
+              - action: input_boolean.turn_off
+                target:
+                  entity_id: input_boolean.prc_hlt_pump_process_in_progress
+mode: restart
