@@ -1,0 +1,68 @@
+alias: "NB: 0000: EMERGENCY: GLOBAL KILL SWITCH (LATCHING)"
+description: ON = Kill System & Disable Logic. OFF = Re-enable Logic.
+triggers:
+  - trigger: state
+    entity_id: input_boolean.emergency
+    to: null
+actions:
+  - choose:
+      - conditions:
+          - condition: template
+            value_template: "{{ trigger.to_state.state == 'on' }}"
+        sequence:
+          - action: system_log.write
+            data:
+              message: ☢️ [EMERGENCY] TRIGGERED. SYSTEM LOCKED.
+              level: error
+          - action: automation.turn_off
+            target:
+              entity_id: automation.nb_0000_process_controller_v5
+          - action: script.turn_off
+            target:
+              entity_id:
+                - script.nb_general_system_hlt_kettle_process_manager
+                - script.nb_0000_god_mode_system_shutdown_safe_reset
+          - action: input_boolean.turn_off
+            target:
+              entity_id:
+                - input_boolean.hlt_pump
+                - input_boolean.wort_pump
+                - input_boolean.clt_pump
+          - action: input_boolean.turn_off
+            target:
+              entity_id:
+                - input_boolean.prc_recirc_hlt
+                - input_boolean.prc_recirc_hlt_5m
+                - input_boolean.prc_recirc_hlt_2m
+                - input_boolean.prc_hlt_to_kettle
+                - input_boolean.prc_kettle_to_hlt
+                - input_boolean.prc_recirc_kettle
+                - input_boolean.prc_recirc_kettle_5m
+                - input_boolean.prc_recirc_kettle_2m
+                - input_boolean.prc_mashin_start
+                - input_boolean.prc_mashin_preheat
+                - input_boolean.prc_vorlauf_mash
+                - input_boolean.prc_prime_wort_pump
+                - input_boolean.prc_pre_sparge
+                - input_boolean.prc_mashout_start
+                - input_boolean.prc_sparge_start
+                - input_boolean.prc_sparge_add_water
+                - input_boolean.prc_preheat_bbt_fv
+                - input_boolean.prc_wort_pump
+                - input_boolean.prc_sparge_prime_grant
+                - input_boolean.prc_sparge_runoff
+                - input_boolean.prc_clt_to_kettle
+                - input_boolean.prc_clt_to_hlt
+          - action: pyscript.reset_all_valves
+      - conditions:
+          - condition: template
+            value_template: "{{ trigger.to_state.state == 'off' }}"
+        sequence:
+          - action: system_log.write
+            data:
+              message: ✅ [EMERGENCY] RESET. SYSTEM ARMED & READY.
+              level: info
+          - action: automation.turn_on
+            target:
+              entity_id: automation.nb_0000_process_controller_v5
+mode: restart
