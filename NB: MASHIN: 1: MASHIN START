@@ -1,0 +1,265 @@
+alias: "NB: MASHIN: 1: MASHIN START"
+description: >-
+  V1.1 - Mash-in process with preheat, drain delay, safety checks, hardware
+  mutex flag, and queued mode
+triggers:
+  - trigger: state
+    entity_id: input_boolean.prc_mashin_start
+    to: "on"
+    id: "on"
+  - trigger: state
+    entity_id: input_boolean.prc_mashin_start
+    to: "off"
+    id: "off"
+conditions: []
+actions:
+  - choose:
+      - conditions:
+          - condition: trigger
+            id: "on"
+        sequence:
+          - action: system_log.write
+            data:
+              message: "MASHIN: Start triggered"
+              level: warning
+          - action: system_log.write
+            data:
+              message: "MASHIN: Waiting for hardware mutex flag to be released"
+              level: warning
+          - wait_template: >-
+              {{ is_state('input_boolean.prc_hlt_pump_process_in_progress',
+              'off') }}
+            timeout:
+              seconds: 30
+          - action: system_log.write
+            data:
+              message: "MASHIN: Acquiring hardware mutex flag"
+              level: warning
+          - action: input_boolean.turn_on
+            target:
+              entity_id: input_boolean.prc_hlt_pump_process_in_progress
+          - action: system_log.write
+            data:
+              message: "MASHIN: Turning off HLT auto mode"
+              level: warning
+          - action: switch.turn_off
+            target:
+              entity_id: switch.hltt_auto
+          - delay:
+              seconds: 1
+          - if:
+              - condition: or
+                conditions:
+                  - condition: state
+                    entity_id: sensor.hltt_burner1_switch_sensor
+                    state: "on"
+                  - condition: state
+                    entity_id: sensor.hltt_burner2_switch_sensor
+                    state: "on"
+            then:
+              - action: system_log.write
+                data:
+                  message: "MASHIN: Burners active - aborting and releasing mutex flag"
+                  level: error
+              - action: input_boolean.turn_off
+                target:
+                  entity_id: input_boolean.prc_hlt_pump_process_in_progress
+              - action: input_boolean.turn_off
+                target:
+                  entity_id: input_boolean.prc_mashin_start
+              - stop: Burners active
+          - action: system_log.write
+            data:
+              message: "MASHIN: Triggering preheat process"
+              level: warning
+          - action: input_boolean.turn_on
+            target:
+              entity_id: input_boolean.prc_mashin_preheat
+          - action: system_log.write
+            data:
+              message: "MASHIN: Waiting for preheat to complete"
+              level: warning
+          - wait_template: "{{ is_state('input_boolean.prc_mashin_preheat', 'off') }}"
+            timeout:
+              minutes: 30
+          - action: system_log.write
+            data:
+              message: "MASHIN: Preheat complete - waiting 3 seconds before process p011"
+              level: warning
+          - delay:
+              seconds: 3
+          - action: pyscript.reset_all_valves
+          - action: system_log.write
+            data:
+              message: "MASHIN: Waiting 5 seconds for valve reset"
+              level: warning
+          - delay:
+              seconds: 5
+          - action: system_log.write
+            data:
+              message: "MASHIN: Executing process p011"
+              level: warning
+          - action: pyscript.execute_process
+            data:
+              process_name: p011
+          - action: system_log.write
+            data:
+              message: "MASHIN: Waiting 5 seconds for valve engagement"
+              level: warning
+          - delay:
+              seconds: 5
+          - action: system_log.write
+            data:
+              message: "MASHIN: Setting pump to 2000 RPM and turning on"
+              level: warning
+          - action: input_number.set_value
+            data:
+              value: 2000
+            target:
+              entity_id: input_number.hlt_speed
+          - action: input_boolean.turn_on
+            target:
+              entity_id: input_boolean.hlt_pump
+          - action: system_log.write
+            data:
+              message: "MASHIN: Running at 2000 RPM for 30 seconds"
+              level: warning
+          - delay:
+              seconds: 30
+          - action: system_log.write
+            data:
+              message: "MASHIN: Increasing pump to 3500 RPM and starting rakes"
+              level: warning
+          - action: input_number.set_value
+            data:
+              value: 3500
+            target:
+              entity_id: input_number.hlt_speed
+          - action: input_number.set_value
+            data:
+              value: 1450
+            target:
+              entity_id: input_number.rakes_speed
+          - action: input_boolean.turn_on
+            target:
+              entity_id: input_boolean.rakes_motor_fwd
+          - action: system_log.write
+            data:
+              message: "MASHIN: Running at 3500 RPM with rakes for 15 seconds"
+              level: warning
+          - delay:
+              seconds: 15
+          - action: system_log.write
+            data:
+              message: "MASHIN: Increasing pump to 5000 RPM"
+              level: warning
+          - action: input_number.set_value
+            data:
+              value: 5000
+            target:
+              entity_id: input_number.hlt_speed
+          - action: system_log.write
+            data:
+              message: "MASHIN: Running at 5000 RPM for 50 seconds"
+              level: warning
+          - delay:
+              seconds: 50
+          - action: system_log.write
+            data:
+              message: "MASHIN: Turning off HLT pump"
+              level: warning
+          - action: input_boolean.turn_off
+            target:
+              entity_id: input_boolean.hlt_pump
+          - action: system_log.write
+            data:
+              message: "MASHIN: Waiting for pump spindown"
+              level: warning
+          - delay:
+              seconds: >-
+                {{ states('input_number.prc_hlt_pump_spindown_duration') |
+                int(0) }}
+          - action: system_log.write
+            data:
+              message: "MASHIN: Resetting all valves"
+              level: warning
+          - action: pyscript.reset_all_valves
+          - action: system_log.write
+            data:
+              message: "MASHIN: Turning off process boolean"
+              level: warning
+          - action: input_boolean.turn_off
+            target:
+              entity_id: input_boolean.prc_mashin_start
+          - action: system_log.write
+            data:
+              message: "MASHIN: Releasing hardware mutex flag"
+              level: warning
+          - action: input_boolean.turn_off
+            target:
+              entity_id: input_boolean.prc_hlt_pump_process_in_progress
+          - action: system_log.write
+            data:
+              message: "MASHIN: Process complete"
+              level: warning
+      - conditions:
+          - condition: trigger
+            id: "off"
+        sequence:
+          - action: system_log.write
+            data:
+              message: "MASHIN: Manual stop triggered"
+              level: warning
+          - action: system_log.write
+            data:
+              message: "MASHIN: Ensuring hardware mutex flag is set"
+              level: warning
+          - action: input_boolean.turn_on
+            target:
+              entity_id: input_boolean.prc_hlt_pump_process_in_progress
+          - action: system_log.write
+            data:
+              message: "MASHIN: Turning off HLT pump"
+              level: warning
+          - action: input_boolean.turn_off
+            target:
+              entity_id: input_boolean.hlt_pump
+          - action: system_log.write
+            data:
+              message: "MASHIN: Turning off rakes"
+              level: warning
+          - action: input_boolean.turn_off
+            target:
+              entity_id: input_boolean.rakes_motor_fwd
+          - action: system_log.write
+            data:
+              message: "MASHIN: Turning off preheat process"
+              level: warning
+          - action: input_boolean.turn_off
+            target:
+              entity_id: input_boolean.prc_mashin_preheat
+          - action: system_log.write
+            data:
+              message: "MASHIN: Waiting for pump spindown"
+              level: warning
+          - delay:
+              seconds: >-
+                {{ states('input_number.prc_hlt_pump_spindown_duration') |
+                int(0) }}
+          - action: system_log.write
+            data:
+              message: "MASHIN: Resetting all valves"
+              level: warning
+          - action: pyscript.reset_all_valves
+          - action: system_log.write
+            data:
+              message: "MASHIN: Releasing hardware mutex flag"
+              level: warning
+          - action: input_boolean.turn_off
+            target:
+              entity_id: input_boolean.prc_hlt_pump_process_in_progress
+          - action: system_log.write
+            data:
+              message: "MASHIN: Manual stop complete"
+              level: warning
+mode: restart
