@@ -1,0 +1,198 @@
+alias: >-
+  NB: 0000: PROCESS CONTROLLER: Process Boolean Logic Handler (V9.1 -
+  KEPLER-107c)
+description: >-
+  V9.1: GEMINI-CORRECTED. Handles START mutual exclusion ONLY. Individual
+  automations handle their own shutdown. No more restart death loop or double
+  shutdown.
+triggers:
+  - id: recirc_hlt
+    trigger: state
+    entity_id: input_boolean.prc_recirc_hlt
+    to: "on"
+  - id: recirc_hlt_5m
+    trigger: state
+    entity_id: input_boolean.prc_recirc_hlt_5m
+    to: "on"
+  - id: recirc_hlt_2m
+    trigger: state
+    entity_id: input_boolean.prc_recirc_hlt_2m
+    to: "on"
+  - id: recirc_kettle
+    trigger: state
+    entity_id: input_boolean.prc_recirc_kettle
+    to: "on"
+  - id: recirc_kettle_5m
+    trigger: state
+    entity_id: input_boolean.prc_recirc_kettle_5m
+    to: "on"
+  - id: recirc_kettle_2m
+    trigger: state
+    entity_id: input_boolean.prc_recirc_kettle_2m
+    to: "on"
+  - id: chill_to_whirlpool
+    trigger: state
+    entity_id: input_boolean.prc_chill_to_whirlpool_temp
+    to: "on"
+  - id: whirlpool
+    trigger: state
+    entity_id: input_boolean.prc_whirlpool
+    to: "on"
+  - id: post_whirlpool_runoff
+    trigger: state
+    entity_id: input_boolean.prc_post_whirlpool_runoff
+    to: "on"
+actions:
+  - action: system_log.write
+    data:
+      message: "🚀 [KEPLER] START: {{ trigger.entity_id }} turned ON"
+      level: warning
+  - repeat:
+      for_each: "{{ all_process_booleans }}"
+      sequence:
+        - if:
+            - condition: template
+              value_template: >-
+                {{ repeat.item != trigger.entity_id and is_state(repeat.item,
+                'on') }}
+          then:
+            - action: input_boolean.turn_off
+              target:
+                entity_id: "{{ repeat.item }}"
+            - action: system_log.write
+              data:
+                message: "🛑 [KEPLER] MUTEX: Turned OFF {{ repeat.item }}"
+                level: info
+  - choose:
+      - conditions:
+          - condition: template
+            value_template: "{{ trigger.id == 'recirc_hlt' }}"
+        sequence:
+          - action: system_log.write
+            data:
+              message: "♨️ [KEPLER] Launching: HLT Recirc Continuous (p004)"
+              level: warning
+          - action: script.nb_general_system_hlt_kettle_process_manager
+            data:
+              process_id: p004
+              pump_boolean: input_boolean.hlt_pump
+              speed_entity: input_number.hlt_speed
+              pump_speed: 5000
+              duration: 0
+              controlling_boolean: input_boolean.prc_recirc_hlt
+      - conditions:
+          - condition: template
+            value_template: "{{ trigger.id == 'recirc_hlt_5m' }}"
+        sequence:
+          - action: system_log.write
+            data:
+              message: "♨️ [KEPLER] Launching: HLT Recirc 5m (p028)"
+              level: warning
+          - action: script.nb_general_system_hlt_kettle_process_manager
+            data:
+              process_id: p028
+              pump_boolean: input_boolean.hlt_pump
+              speed_entity: input_number.hlt_speed
+              pump_speed: 5000
+              duration: 300
+              controlling_boolean: input_boolean.prc_recirc_hlt_5m
+      - conditions:
+          - condition: template
+            value_template: "{{ trigger.id == 'recirc_hlt_2m' }}"
+        sequence:
+          - action: system_log.write
+            data:
+              message: "♨️ [KEPLER] Launching: HLT Recirc 2m (p029)"
+              level: warning
+          - action: script.nb_general_system_hlt_kettle_process_manager
+            data:
+              process_id: p029
+              pump_boolean: input_boolean.hlt_pump
+              speed_entity: input_number.hlt_speed
+              pump_speed: 5000
+              duration: 120
+              controlling_boolean: input_boolean.prc_recirc_hlt_2m
+      - conditions:
+          - condition: template
+            value_template: "{{ trigger.id == 'recirc_kettle' }}"
+        sequence:
+          - action: system_log.write
+            data:
+              message: "🫕 [KEPLER] Launching: Kettle Recirc Continuous (p005)"
+              level: warning
+          - action: script.nb_general_system_hlt_kettle_process_manager
+            data:
+              process_id: p005
+              pump_boolean: input_boolean.hlt_pump
+              speed_entity: input_number.hlt_speed
+              pump_speed: 5000
+              duration: 0
+              controlling_boolean: input_boolean.prc_recirc_kettle
+      - conditions:
+          - condition: template
+            value_template: "{{ trigger.id == 'recirc_kettle_5m' }}"
+        sequence:
+          - action: system_log.write
+            data:
+              message: "🫕 [KEPLER] Launching: Kettle Recirc 5m (p030)"
+              level: warning
+          - action: script.nb_general_system_hlt_kettle_process_manager
+            data:
+              process_id: p030
+              pump_boolean: input_boolean.hlt_pump
+              speed_entity: input_number.hlt_speed
+              pump_speed: 5000
+              duration: 300
+              controlling_boolean: input_boolean.prc_recirc_kettle_5m
+      - conditions:
+          - condition: template
+            value_template: "{{ trigger.id == 'recirc_kettle_2m' }}"
+        sequence:
+          - action: system_log.write
+            data:
+              message: "🫕 [KEPLER] Launching: Kettle Recirc 2m (p031)"
+              level: warning
+          - action: script.nb_general_system_hlt_kettle_process_manager
+            data:
+              process_id: p031
+              pump_boolean: input_boolean.hlt_pump
+              speed_entity: input_number.hlt_speed
+              pump_speed: 5000
+              duration: 120
+              controlling_boolean: input_boolean.prc_recirc_kettle_2m
+      - conditions:
+          - condition: template
+            value_template: "{{ trigger.id == 'chill_to_whirlpool' }}"
+        sequence:
+          - action: system_log.write
+            data:
+              message: "🌡️ [KEPLER] Launching: Chill to Whirlpool Temp (p020)"
+              level: warning
+      - conditions:
+          - condition: template
+            value_template: "{{ trigger.id == 'whirlpool' }}"
+        sequence:
+          - action: system_log.write
+            data:
+              message: "🌀 [KEPLER] Launching: Whirlpool (p021)"
+              level: warning
+      - conditions:
+          - condition: template
+            value_template: "{{ trigger.id == 'post_whirlpool_runoff' }}"
+        sequence:
+          - action: system_log.write
+            data:
+              message: "🚰 [KEPLER] Launching: Post-Whirlpool Runoff (p023)"
+              level: warning
+variables:
+  all_process_booleans:
+    - input_boolean.prc_recirc_hlt
+    - input_boolean.prc_recirc_hlt_5m
+    - input_boolean.prc_recirc_hlt_2m
+    - input_boolean.prc_recirc_kettle
+    - input_boolean.prc_recirc_kettle_5m
+    - input_boolean.prc_recirc_kettle_2m
+    - input_boolean.prc_chill_to_whirlpool_temp
+    - input_boolean.prc_whirlpool
+    - input_boolean.prc_post_whirlpool_runoff
+mode: restart
