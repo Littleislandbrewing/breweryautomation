@@ -1,0 +1,558 @@
+alias: "NB: GENERAL: 2: KETTLE RECIRC Process (V1.3)"
+description: >-
+  V1.3 - Kettle recirculation with hardware mutex flag, removed invalid GOD MODE
+  calls, fixed script names, changed to queued mode
+triggers:
+  - entity_id: input_boolean.prc_recirc_kettle
+    to: "on"
+    id: start
+    trigger: state
+  - entity_id: input_boolean.prc_recirc_kettle
+    to: "off"
+    id: stop
+    trigger: state
+  - entity_id: input_boolean.prc_recirc_kettle_5m
+    to: "on"
+    id: start_5m
+    trigger: state
+  - entity_id: input_boolean.prc_recirc_kettle_5m
+    to: "off"
+    id: stop_5m
+    trigger: state
+  - entity_id: input_boolean.prc_recirc_kettle_2m
+    to: "on"
+    id: start_2m
+    trigger: state
+  - entity_id: input_boolean.prc_recirc_kettle_2m
+    to: "off"
+    id: stop_2m
+    trigger: state
+actions:
+  - choose:
+      - conditions:
+          - condition: trigger
+            id: start
+        sequence:
+          - action: system_log.write
+            data:
+              message: "KETTLE RECIRC: Continuous mode start triggered"
+              level: warning
+          - action: system_log.write
+            data:
+              message: "KETTLE RECIRC: Waiting for hardware mutex flag to be released"
+              level: warning
+          - wait_template: >-
+              {{ is_state('input_boolean.prc_hlt_pump_process_in_progress',
+              'off') }}
+            timeout:
+              seconds: 30
+          - action: system_log.write
+            data:
+              message: "KETTLE RECIRC: Acquiring hardware mutex flag"
+              level: warning
+          - action: input_boolean.turn_on
+            target:
+              entity_id: input_boolean.prc_hlt_pump_process_in_progress
+          - variables:
+              any_other_process_on: |-
+                {{
+                  is_state('input_boolean.prc_recirc_kettle_5m', 'on') or
+                  is_state('input_boolean.prc_recirc_kettle_2m', 'on') or
+                  is_state('input_boolean.prc_recirc_hlt', 'on') or
+                  is_state('input_boolean.prc_recirc_hlt_5m', 'on') or
+                  is_state('input_boolean.prc_recirc_hlt_2m', 'on')
+                }}
+          - if:
+              - condition: template
+                value_template: "{{ any_other_process_on }}"
+            then:
+              - action: system_log.write
+                data:
+                  message: "KETTLE RECIRC: Other processes detected, calling pre-cleanup"
+                  level: warning
+              - action: script.pre_cleanup_safe_state_reset
+              - action: system_log.write
+                data:
+                  message: "KETTLE RECIRC: Waiting for pre-cleanup to complete"
+                  level: warning
+              - wait_template: >-
+                  {{ is_state('input_boolean.cleanup_process_in_progress',
+                  'off') }}
+                timeout:
+                  seconds: 30
+            else:
+              - action: system_log.write
+                data:
+                  message: >-
+                    KETTLE RECIRC: No other processes running, skipping
+                    pre-cleanup
+                  level: warning
+          - action: system_log.write
+            data:
+              message: "KETTLE RECIRC: Executing process p005"
+              level: warning
+          - action: pyscript.execute_process
+            data:
+              process_name: p005
+          - action: system_log.write
+            data:
+              message: "KETTLE RECIRC: Waiting 3 seconds for valve engagement"
+              level: warning
+          - delay:
+              seconds: 3
+          - action: system_log.write
+            data:
+              message: "KETTLE RECIRC: Setting HLT pump speed to 5000"
+              level: warning
+          - action: input_number.set_value
+            target:
+              entity_id: input_number.hlt_speed
+            data:
+              value: 5000
+          - action: system_log.write
+            data:
+              message: "KETTLE RECIRC: Turning on HLT pump (continuous mode)"
+              level: warning
+          - action: input_boolean.turn_on
+            target:
+              entity_id: input_boolean.hlt_pump
+          - action: system_log.write
+            data:
+              message: "KETTLE RECIRC: Continuous mode running, hardware mutex flag held"
+              level: warning
+      - conditions:
+          - condition: trigger
+            id: stop
+        sequence:
+          - action: system_log.write
+            data:
+              message: "KETTLE RECIRC: Continuous mode stop triggered"
+              level: warning
+          - action: system_log.write
+            data:
+              message: "KETTLE RECIRC: Ensuring hardware mutex flag is set"
+              level: warning
+          - action: input_boolean.turn_on
+            target:
+              entity_id: input_boolean.prc_hlt_pump_process_in_progress
+          - action: system_log.write
+            data:
+              message: "KETTLE RECIRC: Turning off HLT pump"
+              level: warning
+          - action: input_boolean.turn_off
+            target:
+              entity_id: input_boolean.hlt_pump
+          - action: system_log.write
+            data:
+              message: "KETTLE RECIRC: Waiting for pump spindown"
+              level: warning
+          - delay:
+              seconds: >-
+                {{ states('input_number.prc_hlt_pump_spindown_duration') |
+                int(0) }}
+          - action: system_log.write
+            data:
+              message: "KETTLE RECIRC: Resetting all valves"
+              level: warning
+          - action: pyscript.reset_all_valves
+          - action: system_log.write
+            data:
+              message: "KETTLE RECIRC: Waiting for valve transit"
+              level: warning
+          - delay:
+              seconds: "{{ states('input_number.prc_valve_transit_delay') | int(0) }}"
+          - action: system_log.write
+            data:
+              message: "KETTLE RECIRC: Releasing hardware mutex flag"
+              level: warning
+          - action: input_boolean.turn_off
+            target:
+              entity_id: input_boolean.prc_hlt_pump_process_in_progress
+          - action: system_log.write
+            data:
+              message: "KETTLE RECIRC: Continuous mode stop complete"
+              level: warning
+      - conditions:
+          - condition: trigger
+            id: start_5m
+        sequence:
+          - action: system_log.write
+            data:
+              message: "KETTLE RECIRC 5M: 5-minute mode start triggered"
+              level: warning
+          - action: system_log.write
+            data:
+              message: "KETTLE RECIRC 5M: Waiting for hardware mutex flag to be released"
+              level: warning
+          - wait_template: >-
+              {{ is_state('input_boolean.prc_hlt_pump_process_in_progress',
+              'off') }}
+            timeout:
+              seconds: 30
+          - action: system_log.write
+            data:
+              message: "KETTLE RECIRC 5M: Acquiring hardware mutex flag"
+              level: warning
+          - action: input_boolean.turn_on
+            target:
+              entity_id: input_boolean.prc_hlt_pump_process_in_progress
+          - variables:
+              any_other_process_on: |-
+                {{
+                  is_state('input_boolean.prc_recirc_kettle', 'on') or
+                  is_state('input_boolean.prc_recirc_kettle_2m', 'on') or
+                  is_state('input_boolean.prc_recirc_hlt', 'on') or
+                  is_state('input_boolean.prc_recirc_hlt_5m', 'on') or
+                  is_state('input_boolean.prc_recirc_hlt_2m', 'on')
+                }}
+          - if:
+              - condition: template
+                value_template: "{{ any_other_process_on }}"
+            then:
+              - action: system_log.write
+                data:
+                  message: >-
+                    KETTLE RECIRC 5M: Other processes detected, calling
+                    pre-cleanup
+                  level: warning
+              - action: script.pre_cleanup_safe_state_reset
+              - action: system_log.write
+                data:
+                  message: "KETTLE RECIRC 5M: Waiting for pre-cleanup to complete"
+                  level: warning
+              - wait_template: >-
+                  {{ is_state('input_boolean.cleanup_process_in_progress',
+                  'off') }}
+                timeout:
+                  seconds: 30
+            else:
+              - action: system_log.write
+                data:
+                  message: >-
+                    KETTLE RECIRC 5M: No other processes running, skipping
+                    pre-cleanup
+                  level: warning
+          - action: system_log.write
+            data:
+              message: "KETTLE RECIRC 5M: Executing process p005"
+              level: warning
+          - action: pyscript.execute_process
+            data:
+              process_name: p005
+          - action: system_log.write
+            data:
+              message: "KETTLE RECIRC 5M: Waiting 3 seconds for valve engagement"
+              level: warning
+          - delay:
+              seconds: 3
+          - action: system_log.write
+            data:
+              message: "KETTLE RECIRC 5M: Setting HLT pump speed to 5000"
+              level: warning
+          - action: input_number.set_value
+            target:
+              entity_id: input_number.hlt_speed
+            data:
+              value: 5000
+          - action: system_log.write
+            data:
+              message: "KETTLE RECIRC 5M: Turning on HLT pump"
+              level: warning
+          - action: input_boolean.turn_on
+            target:
+              entity_id: input_boolean.hlt_pump
+          - action: system_log.write
+            data:
+              message: "KETTLE RECIRC 5M: Running for 300 seconds"
+              level: warning
+          - delay:
+              seconds: 300
+          - action: system_log.write
+            data:
+              message: "KETTLE RECIRC 5M: 5-minute timer complete, stopping pump"
+              level: warning
+          - action: input_boolean.turn_off
+            target:
+              entity_id: input_boolean.hlt_pump
+          - action: system_log.write
+            data:
+              message: "KETTLE RECIRC 5M: Waiting for pump spindown"
+              level: warning
+          - delay:
+              seconds: >-
+                {{ states('input_number.prc_hlt_pump_spindown_duration') |
+                int(0) }}
+          - action: system_log.write
+            data:
+              message: "KETTLE RECIRC 5M: Resetting all valves"
+              level: warning
+          - action: pyscript.reset_all_valves
+          - action: system_log.write
+            data:
+              message: "KETTLE RECIRC 5M: Waiting for valve transit"
+              level: warning
+          - delay:
+              seconds: "{{ states('input_number.prc_valve_transit_delay') | int(0) }}"
+          - action: system_log.write
+            data:
+              message: "KETTLE RECIRC 5M: Turning off 5-minute mode boolean"
+              level: warning
+          - action: input_boolean.turn_off
+            target:
+              entity_id: input_boolean.prc_recirc_kettle_5m
+          - action: system_log.write
+            data:
+              message: "KETTLE RECIRC 5M: Releasing hardware mutex flag"
+              level: warning
+          - action: input_boolean.turn_off
+            target:
+              entity_id: input_boolean.prc_hlt_pump_process_in_progress
+          - action: system_log.write
+            data:
+              message: "KETTLE RECIRC 5M: 5-minute mode complete"
+              level: warning
+      - conditions:
+          - condition: trigger
+            id: stop_5m
+        sequence:
+          - action: system_log.write
+            data:
+              message: "KETTLE RECIRC 5M: Manual stop triggered"
+              level: warning
+          - action: system_log.write
+            data:
+              message: "KETTLE RECIRC 5M: Ensuring hardware mutex flag is set"
+              level: warning
+          - action: input_boolean.turn_on
+            target:
+              entity_id: input_boolean.prc_hlt_pump_process_in_progress
+          - action: system_log.write
+            data:
+              message: "KETTLE RECIRC 5M: Turning off HLT pump"
+              level: warning
+          - action: input_boolean.turn_off
+            target:
+              entity_id: input_boolean.hlt_pump
+          - action: system_log.write
+            data:
+              message: "KETTLE RECIRC 5M: Waiting for pump spindown"
+              level: warning
+          - delay:
+              seconds: >-
+                {{ states('input_number.prc_hlt_pump_spindown_duration') |
+                int(0) }}
+          - action: system_log.write
+            data:
+              message: "KETTLE RECIRC 5M: Resetting all valves"
+              level: warning
+          - action: pyscript.reset_all_valves
+          - action: system_log.write
+            data:
+              message: "KETTLE RECIRC 5M: Waiting for valve transit"
+              level: warning
+          - delay:
+              seconds: "{{ states('input_number.prc_valve_transit_delay') | int(0) }}"
+          - action: system_log.write
+            data:
+              message: "KETTLE RECIRC 5M: Releasing hardware mutex flag"
+              level: warning
+          - action: input_boolean.turn_off
+            target:
+              entity_id: input_boolean.prc_hlt_pump_process_in_progress
+          - action: system_log.write
+            data:
+              message: "KETTLE RECIRC 5M: Manual stop complete"
+              level: warning
+      - conditions:
+          - condition: trigger
+            id: start_2m
+        sequence:
+          - action: system_log.write
+            data:
+              message: "KETTLE RECIRC 2M: 2-minute mode start triggered"
+              level: warning
+          - action: system_log.write
+            data:
+              message: "KETTLE RECIRC 2M: Waiting for hardware mutex flag to be released"
+              level: warning
+          - wait_template: >-
+              {{ is_state('input_boolean.prc_hlt_pump_process_in_progress',
+              'off') }}
+            timeout:
+              seconds: 30
+          - action: system_log.write
+            data:
+              message: "KETTLE RECIRC 2M: Acquiring hardware mutex flag"
+              level: warning
+          - action: input_boolean.turn_on
+            target:
+              entity_id: input_boolean.prc_hlt_pump_process_in_progress
+          - variables:
+              any_other_process_on: |-
+                {{
+                  is_state('input_boolean.prc_recirc_kettle', 'on') or
+                  is_state('input_boolean.prc_recirc_kettle_5m', 'on') or
+                  is_state('input_boolean.prc_recirc_hlt', 'on') or
+                  is_state('input_boolean.prc_recirc_hlt_5m', 'on') or
+                  is_state('input_boolean.prc_recirc_hlt_2m', 'on')
+                }}
+          - if:
+              - condition: template
+                value_template: "{{ any_other_process_on }}"
+            then:
+              - action: system_log.write
+                data:
+                  message: >-
+                    KETTLE RECIRC 2M: Other processes detected, calling
+                    pre-cleanup
+                  level: warning
+              - action: script.pre_cleanup_safe_state_reset
+              - action: system_log.write
+                data:
+                  message: "KETTLE RECIRC 2M: Waiting for pre-cleanup to complete"
+                  level: warning
+              - wait_template: >-
+                  {{ is_state('input_boolean.cleanup_process_in_progress',
+                  'off') }}
+                timeout:
+                  seconds: 30
+            else:
+              - action: system_log.write
+                data:
+                  message: >-
+                    KETTLE RECIRC 2M: No other processes running, skipping
+                    pre-cleanup
+                  level: warning
+          - action: system_log.write
+            data:
+              message: "KETTLE RECIRC 2M: Executing process p005"
+              level: warning
+          - action: pyscript.execute_process
+            data:
+              process_name: p005
+          - action: system_log.write
+            data:
+              message: "KETTLE RECIRC 2M: Waiting 3 seconds for valve engagement"
+              level: warning
+          - delay:
+              seconds: 3
+          - action: system_log.write
+            data:
+              message: "KETTLE RECIRC 2M: Setting HLT pump speed to 5000"
+              level: warning
+          - action: input_number.set_value
+            target:
+              entity_id: input_number.hlt_speed
+            data:
+              value: 5000
+          - action: system_log.write
+            data:
+              message: "KETTLE RECIRC 2M: Turning on HLT pump"
+              level: warning
+          - action: input_boolean.turn_on
+            target:
+              entity_id: input_boolean.hlt_pump
+          - action: system_log.write
+            data:
+              message: "KETTLE RECIRC 2M: Running for 120 seconds"
+              level: warning
+          - delay:
+              seconds: 120
+          - action: system_log.write
+            data:
+              message: "KETTLE RECIRC 2M: 2-minute timer complete, stopping pump"
+              level: warning
+          - action: input_boolean.turn_off
+            target:
+              entity_id: input_boolean.hlt_pump
+          - action: system_log.write
+            data:
+              message: "KETTLE RECIRC 2M: Waiting for pump spindown"
+              level: warning
+          - delay:
+              seconds: >-
+                {{ states('input_number.prc_hlt_pump_spindown_duration') |
+                int(0) }}
+          - action: system_log.write
+            data:
+              message: "KETTLE RECIRC 2M: Resetting all valves"
+              level: warning
+          - action: pyscript.reset_all_valves
+          - action: system_log.write
+            data:
+              message: "KETTLE RECIRC 2M: Waiting for valve transit"
+              level: warning
+          - delay:
+              seconds: "{{ states('input_number.prc_valve_transit_delay') | int(0) }}"
+          - action: system_log.write
+            data:
+              message: "KETTLE RECIRC 2M: Turning off 2-minute mode boolean"
+              level: warning
+          - action: input_boolean.turn_off
+            target:
+              entity_id: input_boolean.prc_recirc_kettle_2m
+          - action: system_log.write
+            data:
+              message: "KETTLE RECIRC 2M: Releasing hardware mutex flag"
+              level: warning
+          - action: input_boolean.turn_off
+            target:
+              entity_id: input_boolean.prc_hlt_pump_process_in_progress
+          - action: system_log.write
+            data:
+              message: "KETTLE RECIRC 2M: 2-minute mode complete"
+              level: warning
+      - conditions:
+          - condition: trigger
+            id: stop_2m
+        sequence:
+          - action: system_log.write
+            data:
+              message: "KETTLE RECIRC 2M: Manual stop triggered"
+              level: warning
+          - action: system_log.write
+            data:
+              message: "KETTLE RECIRC 2M: Ensuring hardware mutex flag is set"
+              level: warning
+          - action: input_boolean.turn_on
+            target:
+              entity_id: input_boolean.prc_hlt_pump_process_in_progress
+          - action: system_log.write
+            data:
+              message: "KETTLE RECIRC 2M: Turning off HLT pump"
+              level: warning
+          - action: input_boolean.turn_off
+            target:
+              entity_id: input_boolean.hlt_pump
+          - action: system_log.write
+            data:
+              message: "KETTLE RECIRC 2M: Waiting for pump spindown"
+              level: warning
+          - delay:
+              seconds: >-
+                {{ states('input_number.prc_hlt_pump_spindown_duration') |
+                int(0) }}
+          - action: system_log.write
+            data:
+              message: "KETTLE RECIRC 2M: Resetting all valves"
+              level: warning
+          - action: pyscript.reset_all_valves
+          - action: system_log.write
+            data:
+              message: "KETTLE RECIRC 2M: Waiting for valve transit"
+              level: warning
+          - delay:
+              seconds: "{{ states('input_number.prc_valve_transit_delay') | int(0) }}"
+          - action: system_log.write
+            data:
+              message: "KETTLE RECIRC 2M: Releasing hardware mutex flag"
+              level: warning
+          - action: input_boolean.turn_off
+            target:
+              entity_id: input_boolean.prc_hlt_pump_process_in_progress
+          - action: system_log.write
+            data:
+              message: "KETTLE RECIRC 2M: Manual stop complete"
+              level: warning
+mode: queued
+max: 3
