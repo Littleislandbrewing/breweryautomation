@@ -1,0 +1,126 @@
+alias: "NB: Mashout Start Controller - v2.1"
+description: Main controller for mashout process (RIGID v2.1)
+triggers:
+  - entity_id: input_boolean.prc_mashout_start
+    to: "on"
+    id: start
+    trigger: state
+  - entity_id: input_boolean.prc_mashout_start
+    to: "off"
+    id: stop
+    trigger: state
+actions:
+  - choose:
+      - conditions:
+          - condition: trigger
+            id: start
+        sequence:
+          - action: system_log.write
+            data:
+              message: "MASHOUT CONTROLLER: Starting sequence"
+              level: warning
+          - target:
+              entity_id: input_boolean.prc_pre_sparge_complete
+            action: input_boolean.turn_off
+          - action: system_log.write
+            data:
+              message: "MASHOUT CONTROLLER: Starting Pre Sparge"
+              level: warning
+          - target:
+              entity_id: input_boolean.prc_pre_sparge
+            action: input_boolean.turn_on
+          - wait_for_trigger:
+              - entity_id: input_boolean.prc_pre_sparge
+                to: "off"
+                trigger: state
+          - if:
+              - condition: state
+                entity_id: input_boolean.prc_pre_sparge_complete
+                state: "off"
+            then:
+              - action: system_log.write
+                data:
+                  message: "MASHOUT CONTROLLER: Pre Sparge aborted, stopping sequence"
+                  level: warning
+              - target:
+                  entity_id: input_boolean.prc_mashout_start
+                action: input_boolean.turn_off
+              - stop: Pre Sparge aborted
+          - target:
+              entity_id: input_boolean.prc_prime_wort_pump_complete
+            action: input_boolean.turn_off
+          - action: system_log.write
+            data:
+              message: "MASHOUT CONTROLLER: Starting Prime Wort Pump"
+              level: warning
+          - target:
+              entity_id: input_boolean.prc_prime_wort_pump
+            action: input_boolean.turn_on
+          - wait_for_trigger:
+              - entity_id: input_boolean.prc_prime_wort_pump
+                to: "off"
+                trigger: state
+          - if:
+              - condition: state
+                entity_id: input_boolean.prc_prime_wort_pump_complete
+                state: "off"
+            then:
+              - action: system_log.write
+                data:
+                  message: >-
+                    MASHOUT CONTROLLER: Prime Wort Pump aborted, stopping
+                    sequence
+                  level: warning
+              - target:
+                  entity_id: input_boolean.prc_mashout_start
+                action: input_boolean.turn_off
+              - stop: Prime Wort Pump aborted
+          - target:
+              entity_id: input_boolean.prc_vorlauf_mash_complete
+            action: input_boolean.turn_off
+          - action: system_log.write
+            data:
+              message: "MASHOUT CONTROLLER: Starting Vorlauf"
+              level: warning
+          - target:
+              entity_id: input_boolean.prc_vorlauf_mash
+            action: input_boolean.turn_on
+          - wait_for_trigger:
+              - entity_id: input_boolean.prc_vorlauf_mash
+                to: "off"
+                trigger: state
+          - if:
+              - condition: state
+                entity_id: input_boolean.prc_vorlauf_mash_complete
+                state: "off"
+            then:
+              - action: system_log.write
+                data:
+                  message: "MASHOUT CONTROLLER: Vorlauf aborted, stopping sequence"
+                  level: warning
+              - target:
+                  entity_id: input_boolean.prc_mashout_start
+                action: input_boolean.turn_off
+              - stop: Vorlauf aborted
+          - action: system_log.write
+            data:
+              message: "MASHOUT CONTROLLER: Sequence finished"
+              level: warning
+          - target:
+              entity_id: input_boolean.prc_mashout_start
+            action: input_boolean.turn_off
+      - conditions:
+          - condition: trigger
+            id: stop
+        sequence:
+          - action: system_log.write
+            data:
+              message: "MASHOUT CONTROLLER: Stop triggered, aborting all"
+              level: warning
+          - target:
+              entity_id:
+                - input_boolean.prc_pre_sparge
+                - input_boolean.prc_prime_wort_pump
+                - input_boolean.prc_vorlauf_mash
+            action: input_boolean.turn_off
+mode: restart
