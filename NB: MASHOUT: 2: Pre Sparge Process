@@ -1,0 +1,265 @@
+alias: "NB: MASHOUT: 2: Pre Sparge Process"
+description: >-
+  V2.1 - Pre sparge valve and pump sequence with hardware mutex flag, works
+  standalone or called by parent
+triggers:
+  - entity_id: input_boolean.prc_pre_sparge
+    to: "on"
+    id: start
+    trigger: state
+  - entity_id: input_boolean.prc_pre_sparge
+    to: "off"
+    id: stop
+    trigger: state
+actions:
+  - choose:
+      - conditions:
+          - condition: trigger
+            id: start
+        sequence:
+          - action: input_boolean.turn_off
+            target:
+              entity_id: input_boolean.prc_pre_sparge_complete
+          - action: system_log.write
+            data:
+              message: "PRE SPARGE: Start triggered"
+              level: warning
+          - variables:
+              i_acquired_flag: >-
+                {{ is_state('input_boolean.prc_hlt_pump_process_in_progress',
+                'off') }}
+          - if:
+              - condition: template
+                value_template: "{{ i_acquired_flag }}"
+            then:
+              - action: system_log.write
+                data:
+                  message: >-
+                    PRE SPARGE: Flag available - acquiring hardware mutex flag
+                    (standalone mode)
+                  level: warning
+              - wait_template: >-
+                  {{ is_state('input_boolean.prc_hlt_pump_process_in_progress',
+                  'off') }}
+                timeout:
+                  seconds: 30
+              - action: input_boolean.turn_on
+                target:
+                  entity_id: input_boolean.prc_hlt_pump_process_in_progress
+            else:
+              - action: system_log.write
+                data:
+                  message: >-
+                    PRE SPARGE: Flag already held by parent - proceeding without
+                    acquiring (called by controller)
+                  level: warning
+          - action: system_log.write
+            data:
+              message: "PRE SPARGE: Turning off dependent process booleans"
+              level: warning
+          - action: input_boolean.turn_off
+            target:
+              entity_id: input_boolean.prc_prime_wort_pump
+          - action: input_boolean.turn_off
+            target:
+              entity_id: input_boolean.prc_vorlauf_mash
+          - action: system_log.write
+            data:
+              message: "PRE SPARGE: Starting timer"
+              level: warning
+          - action: timer.start
+            target:
+              entity_id: timer.prc_pre_sparge
+            data:
+              duration: >-
+                {{ (states('input_number.prc_pre_sparge_duration') | int(0)) +
+                (states('input_number.prc_hlt_pump_spindown_duration') | int(0))
+                + 3 }}
+          - action: system_log.write
+            data:
+              message: "PRE SPARGE: Executing process p012"
+              level: warning
+          - action: pyscript.execute_process
+            data:
+              process_name: p012
+          - action: system_log.write
+            data:
+              message: "PRE SPARGE: Waiting 3 seconds for valve engagement"
+              level: warning
+          - delay:
+              seconds: 3
+          - action: system_log.write
+            data:
+              message: "PRE SPARGE: Setting HLT pump to 5000 RPM and turning on"
+              level: warning
+          - action: input_number.set_value
+            target:
+              entity_id: input_number.hlt_speed
+            data:
+              value: 5000
+          - action: input_boolean.turn_on
+            target:
+              entity_id: input_boolean.hlt_pump
+          - action: system_log.write
+            data:
+              message: "PRE SPARGE: Running for configured duration"
+              level: warning
+          - delay:
+              seconds: "{{ states('input_number.prc_pre_sparge_duration') | int(0) }}"
+          - action: system_log.write
+            data:
+              message: "PRE SPARGE: Duration complete, turning off pump"
+              level: warning
+          - action: input_boolean.turn_off
+            target:
+              entity_id: input_boolean.hlt_pump
+          - action: system_log.write
+            data:
+              message: "PRE SPARGE: Waiting for pump spindown"
+              level: warning
+          - delay:
+              seconds: >-
+                {{ states('input_number.prc_hlt_pump_spindown_duration') |
+                int(0) }}
+          - action: system_log.write
+            data:
+              message: "PRE SPARGE: Resetting all valves"
+              level: warning
+          - action: pyscript.reset_all_valves
+          - action: system_log.write
+            data:
+              message: "PRE SPARGE: Cancelling timer"
+              level: warning
+          - action: timer.cancel
+            target:
+              entity_id: timer.prc_pre_sparge
+          - action: system_log.write
+            data:
+              message: "PRE SPARGE: Setting completion flag"
+              level: warning
+          - action: input_boolean.turn_on
+            target:
+              entity_id: input_boolean.prc_pre_sparge_complete
+          - action: system_log.write
+            data:
+              message: "PRE SPARGE: Turning off process boolean"
+              level: warning
+          - action: input_boolean.turn_off
+            target:
+              entity_id: input_boolean.prc_pre_sparge
+          - if:
+              - condition: template
+                value_template: "{{ i_acquired_flag }}"
+            then:
+              - action: system_log.write
+                data:
+                  message: "PRE SPARGE: Releasing hardware mutex flag (standalone mode)"
+                  level: warning
+              - action: input_boolean.turn_off
+                target:
+                  entity_id: input_boolean.prc_hlt_pump_process_in_progress
+            else:
+              - action: system_log.write
+                data:
+                  message: >-
+                    PRE SPARGE: Not releasing flag - parent still holds it
+                    (called by controller)
+                  level: warning
+          - action: system_log.write
+            data:
+              message: "PRE SPARGE: Process complete"
+              level: warning
+      - conditions:
+          - condition: trigger
+            id: stop
+          - condition: state
+            entity_id: input_boolean.prc_pre_sparge_complete
+            state: "off"
+        sequence:
+          - action: system_log.write
+            data:
+              message: "PRE SPARGE: ABORT - Emergency cleanup triggered"
+              level: warning
+          - variables:
+              i_acquired_flag: >-
+                {{ is_state('input_boolean.prc_hlt_pump_process_in_progress',
+                'off') }}
+          - if:
+              - condition: template
+                value_template: "{{ i_acquired_flag }}"
+            then:
+              - action: system_log.write
+                data:
+                  message: >-
+                    PRE SPARGE: Acquiring hardware mutex flag for cleanup
+                    (standalone mode)
+                  level: warning
+              - action: input_boolean.turn_on
+                target:
+                  entity_id: input_boolean.prc_hlt_pump_process_in_progress
+            else:
+              - action: system_log.write
+                data:
+                  message: >-
+                    PRE SPARGE: Flag already held - proceeding with cleanup
+                    (called by controller)
+                  level: warning
+          - action: system_log.write
+            data:
+              message: "PRE SPARGE: Cancelling timer"
+              level: warning
+          - action: timer.cancel
+            target:
+              entity_id: timer.prc_pre_sparge
+          - action: system_log.write
+            data:
+              message: "PRE SPARGE: Turning off HLT pump"
+              level: warning
+          - action: input_boolean.turn_off
+            target:
+              entity_id: input_boolean.hlt_pump
+          - action: system_log.write
+            data:
+              message: "PRE SPARGE: Waiting for pump spindown"
+              level: warning
+          - delay:
+              seconds: >-
+                {{ states('input_number.prc_hlt_pump_spindown_duration') |
+                int(0) }}
+          - action: system_log.write
+            data:
+              message: "PRE SPARGE: Resetting HLT speed to 0"
+              level: warning
+          - action: input_number.set_value
+            target:
+              entity_id: input_number.hlt_speed
+            data:
+              value: 0
+          - action: system_log.write
+            data:
+              message: "PRE SPARGE: Resetting all valves"
+              level: warning
+          - action: pyscript.reset_all_valves
+          - if:
+              - condition: template
+                value_template: "{{ i_acquired_flag }}"
+            then:
+              - action: system_log.write
+                data:
+                  message: "PRE SPARGE: Releasing hardware mutex flag (standalone mode)"
+                  level: warning
+              - action: input_boolean.turn_off
+                target:
+                  entity_id: input_boolean.prc_hlt_pump_process_in_progress
+            else:
+              - action: system_log.write
+                data:
+                  message: >-
+                    PRE SPARGE: Not releasing flag - parent still holds it
+                    (called by controller)
+                  level: warning
+          - action: system_log.write
+            data:
+              message: "PRE SPARGE: Emergency cleanup complete"
+              level: warning
+mode: restart
