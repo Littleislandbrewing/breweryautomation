@@ -1,0 +1,120 @@
+alias: "NB: MASHOUT: 3: Prime Wort Pump Process"
+description: >-
+  V2.1 - Prime wort grant and pump sequence with fixed template syntax and
+  queued mode
+triggers:
+  - entity_id: input_boolean.prc_prime_wort_pump
+    to: "on"
+    id: start
+    trigger: state
+  - entity_id: input_boolean.prc_prime_wort_pump
+    to: "off"
+    id: stop
+    trigger: state
+actions:
+  - choose:
+      - conditions:
+          - condition: trigger
+            id: start
+        sequence:
+          - action: input_boolean.turn_off
+            target:
+              entity_id: input_boolean.prc_prime_wort_pump_complete
+          - action: system_log.write
+            data:
+              message: "PRIME WORT PUMP: Start sequence initiated"
+              level: warning
+          - action: system_log.write
+            data:
+              message: "PRIME WORT PUMP: Turning off dependent process booleans"
+              level: warning
+          - action: input_boolean.turn_off
+            target:
+              entity_id: input_boolean.prc_pre_sparge
+          - action: input_boolean.turn_off
+            target:
+              entity_id: input_boolean.prc_vorlauf_mash
+          - action: system_log.write
+            data:
+              message: "PRIME WORT PUMP: Starting timer"
+              level: warning
+          - action: timer.start
+            target:
+              entity_id: timer.prc_prime_wort_pump
+            data:
+              duration: >-
+                {{ states('input_number.prc_prime_wort_pump_duration') | int(0)
+                }}
+          - action: system_log.write
+            data:
+              message: "PRIME WORT PUMP: Executing process p013"
+              level: warning
+          - action: pyscript.execute_process
+            data:
+              process_name: p013
+          - action: system_log.write
+            data:
+              message: "PRIME WORT PUMP: Waiting for configured duration"
+              level: warning
+          - delay:
+              seconds: >-
+                {{ states('input_number.prc_prime_wort_pump_duration') | int(0)
+                }}
+          - action: system_log.write
+            data:
+              message: "PRIME WORT PUMP: Duration complete, resetting valves"
+              level: warning
+          - action: pyscript.reset_all_valves
+          - action: system_log.write
+            data:
+              message: "PRIME WORT PUMP: Cancelling timer"
+              level: warning
+          - action: timer.cancel
+            target:
+              entity_id: timer.prc_prime_wort_pump
+          - action: system_log.write
+            data:
+              message: "PRIME WORT PUMP: Setting completion flag"
+              level: warning
+          - action: input_boolean.turn_on
+            target:
+              entity_id: input_boolean.prc_prime_wort_pump_complete
+          - action: system_log.write
+            data:
+              message: "PRIME WORT PUMP: Turning off process boolean"
+              level: warning
+          - action: input_boolean.turn_off
+            target:
+              entity_id: input_boolean.prc_prime_wort_pump
+          - action: system_log.write
+            data:
+              message: "PRIME WORT PUMP: Process complete"
+              level: warning
+      - conditions:
+          - condition: trigger
+            id: stop
+          - condition: state
+            entity_id: input_boolean.prc_prime_wort_pump_complete
+            state: "off"
+        sequence:
+          - action: system_log.write
+            data:
+              message: "PRIME WORT PUMP: ABORT - Emergency cleanup triggered"
+              level: warning
+          - action: system_log.write
+            data:
+              message: "PRIME WORT PUMP: Cancelling timer"
+              level: warning
+          - action: timer.cancel
+            target:
+              entity_id: timer.prc_prime_wort_pump
+          - action: system_log.write
+            data:
+              message: "PRIME WORT PUMP: Resetting all valves"
+              level: warning
+          - action: pyscript.reset_all_valves
+          - action: system_log.write
+            data:
+              message: "PRIME WORT PUMP: Emergency cleanup complete"
+              level: warning
+mode: restart
