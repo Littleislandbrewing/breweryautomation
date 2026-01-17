@@ -1,0 +1,261 @@
+alias: "NB: MASHIN: 2: PREHEAT"
+description: >-
+  V1.1 - Preheat mash tun with hot water flush, hardware mutex flag, works
+  standalone or called by parent
+triggers:
+  - trigger: state
+    entity_id: input_boolean.prc_mashin_preheat
+    to: "on"
+    id: "on"
+  - trigger: state
+    entity_id: input_boolean.prc_mashin_preheat
+    to: "off"
+    id: "off"
+conditions: []
+actions:
+  - choose:
+      - conditions:
+          - condition: trigger
+            id: "on"
+        sequence:
+          - action: system_log.write
+            data:
+              message: "PREHEAT: Start triggered"
+              level: warning
+          - variables:
+              i_acquired_flag: >-
+                {{ is_state('input_boolean.prc_hlt_pump_process_in_progress',
+                'off') }}
+          - if:
+              - condition: template
+                value_template: "{{ i_acquired_flag }}"
+            then:
+              - action: system_log.write
+                data:
+                  message: >-
+                    PREHEAT: Flag available - acquiring hardware mutex flag
+                    (standalone mode)
+                  level: warning
+              - wait_template: >-
+                  {{ is_state('input_boolean.prc_hlt_pump_process_in_progress',
+                  'off') }}
+                timeout:
+                  seconds: 30
+              - action: input_boolean.turn_on
+                target:
+                  entity_id: input_boolean.prc_hlt_pump_process_in_progress
+            else:
+              - action: system_log.write
+                data:
+                  message: >-
+                    PREHEAT: Flag already held by parent - proceeding without
+                    acquiring (called by mashin_start)
+                  level: warning
+          - action: system_log.write
+            data:
+              message: "PREHEAT: Turning off HLT auto mode"
+              level: warning
+          - action: switch.turn_off
+            target:
+              entity_id: switch.hltt_auto
+          - delay:
+              seconds: 1
+          - if:
+              - condition: or
+                conditions:
+                  - condition: state
+                    entity_id: sensor.hltt_burner1_switch_sensor
+                    state: "on"
+                  - condition: state
+                    entity_id: sensor.hltt_burner2_switch_sensor
+                    state: "on"
+            then:
+              - action: system_log.write
+                data:
+                  message: "PREHEAT: Burners active - aborting"
+                  level: error
+              - if:
+                  - condition: template
+                    value_template: "{{ i_acquired_flag }}"
+                then:
+                  - action: system_log.write
+                    data:
+                      message: "PREHEAT: Releasing hardware mutex flag"
+                      level: warning
+                  - action: input_boolean.turn_off
+                    target:
+                      entity_id: input_boolean.prc_hlt_pump_process_in_progress
+              - action: input_boolean.turn_off
+                target:
+                  entity_id: input_boolean.prc_mashin_preheat
+              - stop: Burners active
+          - action: system_log.write
+            data:
+              message: "PREHEAT: Resetting all valves"
+              level: warning
+          - action: pyscript.reset_all_valves
+          - action: system_log.write
+            data:
+              message: "PREHEAT: Waiting 5 seconds for valve reset"
+              level: warning
+          - delay:
+              seconds: 5
+          - action: system_log.write
+            data:
+              message: "PREHEAT: Executing process p010"
+              level: warning
+          - action: pyscript.execute_process
+            data:
+              process_name: p010
+          - action: system_log.write
+            data:
+              message: "PREHEAT: Waiting 5 seconds for valve engagement"
+              level: warning
+          - delay:
+              seconds: 5
+          - action: system_log.write
+            data:
+              message: "PREHEAT: Setting HLT pump to 5000 RPM and turning on"
+              level: warning
+          - action: input_number.set_value
+            data:
+              value: 5000
+            target:
+              entity_id: input_number.hlt_speed
+          - action: input_boolean.turn_on
+            target:
+              entity_id: input_boolean.hlt_pump
+          - action: system_log.write
+            data:
+              message: "PREHEAT: Running pump for 20 seconds"
+              level: warning
+          - delay:
+              seconds: 20
+          - action: system_log.write
+            data:
+              message: "PREHEAT: Turning off HLT pump"
+              level: warning
+          - action: input_boolean.turn_off
+            target:
+              entity_id: input_boolean.hlt_pump
+          - action: system_log.write
+            data:
+              message: >-
+                PREHEAT: Waiting for pump spindown and drain delay (50 seconds
+                total)
+              level: warning
+          - delay:
+              seconds: >-
+                {{ states('input_number.prc_hlt_pump_spindown_duration') |
+                int(0) }}
+          - delay:
+              seconds: 40
+          - action: system_log.write
+            data:
+              message: "PREHEAT: Resetting all valves"
+              level: warning
+          - action: pyscript.reset_all_valves
+          - action: system_log.write
+            data:
+              message: "PREHEAT: Turning off process boolean"
+              level: warning
+          - action: input_boolean.turn_off
+            target:
+              entity_id: input_boolean.prc_mashin_preheat
+          - if:
+              - condition: template
+                value_template: "{{ i_acquired_flag }}"
+            then:
+              - action: system_log.write
+                data:
+                  message: "PREHEAT: Releasing hardware mutex flag (standalone mode)"
+                  level: warning
+              - action: input_boolean.turn_off
+                target:
+                  entity_id: input_boolean.prc_hlt_pump_process_in_progress
+            else:
+              - action: system_log.write
+                data:
+                  message: >-
+                    PREHEAT: Not releasing flag - parent still holds it (called
+                    by mashin_start)
+                  level: warning
+          - action: system_log.write
+            data:
+              message: "PREHEAT: Process complete"
+              level: warning
+      - conditions:
+          - condition: trigger
+            id: "off"
+        sequence:
+          - action: system_log.write
+            data:
+              message: "PREHEAT: Manual stop triggered"
+              level: warning
+          - variables:
+              i_acquired_flag: >-
+                {{ is_state('input_boolean.prc_hlt_pump_process_in_progress',
+                'off') }}
+          - if:
+              - condition: template
+                value_template: "{{ i_acquired_flag }}"
+            then:
+              - action: system_log.write
+                data:
+                  message: >-
+                    PREHEAT: Acquiring hardware mutex flag for cleanup
+                    (standalone mode)
+                  level: warning
+              - action: input_boolean.turn_on
+                target:
+                  entity_id: input_boolean.prc_hlt_pump_process_in_progress
+            else:
+              - action: system_log.write
+                data:
+                  message: >-
+                    PREHEAT: Flag already held - proceeding with cleanup (called
+                    by mashin_start)
+                  level: warning
+          - action: system_log.write
+            data:
+              message: "PREHEAT: Turning off HLT pump"
+              level: warning
+          - action: input_boolean.turn_off
+            target:
+              entity_id: input_boolean.hlt_pump
+          - action: system_log.write
+            data:
+              message: "PREHEAT: Waiting for pump spindown"
+              level: warning
+          - delay:
+              seconds: >-
+                {{ states('input_number.prc_hlt_pump_spindown_duration') |
+                int(0) }}
+          - action: system_log.write
+            data:
+              message: "PREHEAT: Resetting all valves"
+              level: warning
+          - action: pyscript.reset_all_valves
+          - if:
+              - condition: template
+                value_template: "{{ i_acquired_flag }}"
+            then:
+              - action: system_log.write
+                data:
+                  message: "PREHEAT: Releasing hardware mutex flag (standalone mode)"
+                  level: warning
+              - action: input_boolean.turn_off
+                target:
+                  entity_id: input_boolean.prc_hlt_pump_process_in_progress
+            else:
+              - action: system_log.write
+                data:
+                  message: >-
+                    PREHEAT: Not releasing flag - parent still holds it (called
+                    by mashin_start)
+                  level: warning
+          - action: system_log.write
+            data:
+              message: "PREHEAT: Manual stop complete"
+              level: warning
+mode: restart
