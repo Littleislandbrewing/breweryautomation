@@ -1,0 +1,122 @@
+alias: "NB: POST BOIL: Runoff Controller (V0.1-ALPHA - KEPLER-107c)"
+description: >-
+  V0.1: Greenfield build - p022, dual pump, volume monitoring, GOD MODE
+  integration
+triggers:
+  - entity_id: input_boolean.prc_post_boil_runoff_startstop
+    to: "on"
+    id: start
+    trigger: state
+  - entity_id: input_boolean.prc_post_boil_runoff_startstop
+    to: "off"
+    id: stop
+    trigger: state
+conditions:
+  - condition: state
+    entity_id: input_boolean.emergency
+    state: "off"
+actions:
+  - choose:
+      - conditions:
+          - condition: trigger
+            id: start
+        sequence:
+          - action: system_log.write
+            data:
+              message: "🚀 [RUNOFF] START: Initiating post-boil runoff sequence"
+              level: info
+          - action: pyscript.execute_process
+            data:
+              process_name: p022
+          - delay:
+              seconds: >-
+                {{ states('input_number.prc_valve_transit_delay_open') | int(5)
+                }}
+          - action: system_log.write
+            data:
+              message: ⏳ [RUNOFF] Valves open - Starting CLT pump @ 5000 RPM
+              level: info
+          - action: input_number.set_value
+            target:
+              entity_id: input_number.clt_speed
+            data:
+              value: 5000
+          - action: input_boolean.turn_on
+            target:
+              entity_id: input_boolean.clt_pump
+          - delay:
+              seconds: 5
+          - action: system_log.write
+            data:
+              message: ⏳ [RUNOFF] CLT pump stable - Starting wort pump @ 5000 RPM
+              level: info
+          - action: input_number.set_value
+            target:
+              entity_id: input_number.prc_wort_pump_speed
+            data:
+              value: 5000
+          - action: input_boolean.turn_on
+            target:
+              entity_id: input_boolean.prc_wort_pump
+          - action: system_log.write
+            data:
+              message: >-
+                ♨️ [RUNOFF] Both pumps running - Monitoring kettle volume
+                (target: ≤100L)
+              level: info
+          - wait_template: |-
+              {{ states('sensor.prct_current_kettle_volume') | float(999) <= 100
+                 or not is_state('input_boolean.prc_post_boil_runoff_startstop', 'on') }}
+          - if:
+              - condition: template
+                value_template: >-
+                  {{ not
+                  is_state('input_boolean.prc_post_boil_runoff_startstop', 'on')
+                  }}
+            then:
+              - action: system_log.write
+                data:
+                  message: "🚫 [RUNOFF] ABORT: User stopped runoff manually"
+                  level: warning
+              - data: {}
+                action: script.nb_0000_god_mode_system_shutdown_safe_reset
+              - stop: User abort during runoff
+            else:
+              - action: system_log.write
+                data:
+                  message: >-
+                    ✅ [RUNOFF] Volume target reached (≤100L) - Shutting down
+                    wort pump
+                  level: info
+              - action: input_boolean.turn_off
+                target:
+                  entity_id: input_boolean.prc_wort_pump
+              - delay:
+                  seconds: 5
+              - action: system_log.write
+                data:
+                  message: ⏳ [RUNOFF] Wort pump off - Shutting down CLT pump
+                  level: info
+              - action: input_boolean.turn_off
+                target:
+                  entity_id: input_boolean.clt_pump
+              - data: {}
+                action: script.nb_0000_god_mode_system_shutdown_safe_reset
+              - action: system_log.write
+                data:
+                  message: ✅ [RUNOFF] Complete - Turning off control boolean
+                  level: info
+              - action: input_boolean.turn_off
+                target:
+                  entity_id: input_boolean.prc_post_boil_runoff_startstop
+      - conditions:
+          - condition: trigger
+            id: stop
+        sequence:
+          - action: system_log.write
+            data:
+              message: "🛑 [RUNOFF] STOP: Emergency shutdown triggered"
+              level: warning
+          - data: {}
+            action: script.nb_0000_god_mode_system_shutdown_safe_reset
+mode: restart
