@@ -1,0 +1,1752 @@
+alias: "NB: SPARGE: 98: Sparge Step Controller + Startup Default (V2.7)"
+description: >-
+  Production sparge controller with fixed triggers, recovery logic, restart
+  mode, and NYE easter egg
+triggers:
+  - event: start
+    id: startup
+    trigger: homeassistant
+  - entity_id:
+      - input_boolean.prc_mashout_step01
+      - input_boolean.prc_mashout_step02
+      - input_boolean.prc_mashout_step03
+      - input_boolean.prc_mashout_step04
+      - input_boolean.prc_mashout_step05
+      - input_boolean.prc_mashout_step06
+      - input_boolean.prc_mashout_step07
+      - input_boolean.prc_mashout_step08
+      - input_boolean.prc_mashout_step09
+      - input_boolean.prc_mashout_step10
+    to: "on"
+    id: select
+    trigger: state
+  - entity_id:
+      - input_boolean.prc_runoff_volume_650
+      - input_boolean.prc_runoff_volume_750
+      - input_boolean.prc_runoff_volume_1050
+      - input_boolean.prc_runoff_volume_1100
+      - input_boolean.prc_runoff_volume_1200
+    to: "on"
+    id: volume_preset_button
+    trigger: state
+  - entity_id: sensor.prct_current_sparge_flow_volume
+    id: volume_check
+    trigger: state
+  - entity_id: input_number.prc_wort_volume_required
+    id: volume_changed
+    trigger: state
+actions:
+  - choose:
+      - conditions:
+          - condition: trigger
+            id: startup
+          - condition: state
+            entity_id:
+              - input_boolean.prc_mashout_step01
+              - input_boolean.prc_mashout_step02
+              - input_boolean.prc_mashout_step03
+              - input_boolean.prc_mashout_step04
+              - input_boolean.prc_mashout_step05
+              - input_boolean.prc_mashout_step06
+              - input_boolean.prc_mashout_step07
+              - input_boolean.prc_mashout_step08
+              - input_boolean.prc_mashout_step09
+              - input_boolean.prc_mashout_step10
+            state: "off"
+            match: all
+        sequence:
+          - choose:
+              - conditions:
+                  - condition: numeric_state
+                    entity_id: input_number.prc_mashout_current_step
+                    above: 0
+                    below: 11
+                sequence:
+                  - choose:
+                      - conditions:
+                          - condition: template
+                            value_template: >-
+                              {{ states('input_number.prc_mashout_current_step')
+                              | int(0) == 1 }}
+                        sequence:
+                          - action: input_boolean.turn_on
+                            target:
+                              entity_id: input_boolean.prc_mashout_step01
+                      - conditions:
+                          - condition: template
+                            value_template: >-
+                              {{ states('input_number.prc_mashout_current_step')
+                              | int(0) == 2 }}
+                        sequence:
+                          - action: input_boolean.turn_on
+                            target:
+                              entity_id: input_boolean.prc_mashout_step02
+                      - conditions:
+                          - condition: template
+                            value_template: >-
+                              {{ states('input_number.prc_mashout_current_step')
+                              | int(0) == 3 }}
+                        sequence:
+                          - action: input_boolean.turn_on
+                            target:
+                              entity_id: input_boolean.prc_mashout_step03
+                      - conditions:
+                          - condition: template
+                            value_template: >-
+                              {{ states('input_number.prc_mashout_current_step')
+                              | int(0) == 4 }}
+                        sequence:
+                          - action: input_boolean.turn_on
+                            target:
+                              entity_id: input_boolean.prc_mashout_step04
+                      - conditions:
+                          - condition: template
+                            value_template: >-
+                              {{ states('input_number.prc_mashout_current_step')
+                              | int(0) == 5 }}
+                        sequence:
+                          - action: input_boolean.turn_on
+                            target:
+                              entity_id: input_boolean.prc_mashout_step05
+                      - conditions:
+                          - condition: template
+                            value_template: >-
+                              {{ states('input_number.prc_mashout_current_step')
+                              | int(0) == 6 }}
+                        sequence:
+                          - action: input_boolean.turn_on
+                            target:
+                              entity_id: input_boolean.prc_mashout_step06
+                      - conditions:
+                          - condition: template
+                            value_template: >-
+                              {{ states('input_number.prc_mashout_current_step')
+                              | int(0) == 7 }}
+                        sequence:
+                          - action: input_boolean.turn_on
+                            target:
+                              entity_id: input_boolean.prc_mashout_step07
+                      - conditions:
+                          - condition: template
+                            value_template: >-
+                              {{ states('input_number.prc_mashout_current_step')
+                              | int(0) == 8 }}
+                        sequence:
+                          - action: input_boolean.turn_on
+                            target:
+                              entity_id: input_boolean.prc_mashout_step08
+                      - conditions:
+                          - condition: template
+                            value_template: >-
+                              {{ states('input_number.prc_mashout_current_step')
+                              | int(0) == 9 }}
+                        sequence:
+                          - action: input_boolean.turn_on
+                            target:
+                              entity_id: input_boolean.prc_mashout_step09
+                      - conditions:
+                          - condition: template
+                            value_template: >-
+                              {{ states('input_number.prc_mashout_current_step')
+                              | int(0) == 10 }}
+                        sequence:
+                          - action: input_boolean.turn_on
+                            target:
+                              entity_id: input_boolean.prc_mashout_step10
+                  - action: system_log.write
+                    data:
+                      message: >-
+                        Sparge Controller: Startup - Resumed at Step {{
+                        states('input_number.prc_mashout_current_step') }}
+                      level: warning
+            default:
+              - target:
+                  entity_id: input_boolean.prc_mashout_step01
+                action: input_boolean.turn_on
+              - target:
+                  entity_id: input_number.prc_mashout_current_step
+                data:
+                  value: 1
+                action: input_number.set_value
+              - action: system_log.write
+                data:
+                  message: "Sparge Controller: Startup - Activated Step 01"
+                  level: info
+      - conditions:
+          - condition: trigger
+            id: volume_preset_button
+        sequence:
+          - action: system_log.write
+            data:
+              message: >-
+                Sparge Controller: Volume preset button pressed - {{
+                trigger.to_state.attributes.friendly_name }}
+              level: info
+          - choose:
+              - conditions:
+                  - condition: template
+                    value_template: >-
+                      {{ trigger.entity_id ==
+                      'input_boolean.prc_runoff_volume_650' }}
+                sequence:
+                  - target:
+                      entity_id:
+                        - input_boolean.prc_runoff_volume_750
+                        - input_boolean.prc_runoff_volume_1050
+                        - input_boolean.prc_runoff_volume_1100
+                        - input_boolean.prc_runoff_volume_1200
+                    action: input_boolean.turn_off
+                  - target:
+                      entity_id: input_number.prc_wort_volume_required
+                    data:
+                      value: 650
+                    action: input_number.set_value
+              - conditions:
+                  - condition: template
+                    value_template: >-
+                      {{ trigger.entity_id ==
+                      'input_boolean.prc_runoff_volume_750' }}
+                sequence:
+                  - target:
+                      entity_id:
+                        - input_boolean.prc_runoff_volume_650
+                        - input_boolean.prc_runoff_volume_1050
+                        - input_boolean.prc_runoff_volume_1100
+                        - input_boolean.prc_runoff_volume_1200
+                    action: input_boolean.turn_off
+                  - target:
+                      entity_id: input_number.prc_wort_volume_required
+                    data:
+                      value: 750
+                    action: input_number.set_value
+              - conditions:
+                  - condition: template
+                    value_template: >-
+                      {{ trigger.entity_id ==
+                      'input_boolean.prc_runoff_volume_1050' }}
+                sequence:
+                  - target:
+                      entity_id:
+                        - input_boolean.prc_runoff_volume_650
+                        - input_boolean.prc_runoff_volume_750
+                        - input_boolean.prc_runoff_volume_1100
+                        - input_boolean.prc_runoff_volume_1200
+                    action: input_boolean.turn_off
+                  - target:
+                      entity_id: input_number.prc_wort_volume_required
+                    data:
+                      value: 1050
+                    action: input_number.set_value
+              - conditions:
+                  - condition: template
+                    value_template: >-
+                      {{ trigger.entity_id ==
+                      'input_boolean.prc_runoff_volume_1100' }}
+                sequence:
+                  - target:
+                      entity_id:
+                        - input_boolean.prc_runoff_volume_650
+                        - input_boolean.prc_runoff_volume_750
+                        - input_boolean.prc_runoff_volume_1050
+                        - input_boolean.prc_runoff_volume_1200
+                    action: input_boolean.turn_off
+                  - target:
+                      entity_id: input_number.prc_wort_volume_required
+                    data:
+                      value: 1100
+                    action: input_number.set_value
+              - conditions:
+                  - condition: template
+                    value_template: >-
+                      {{ trigger.entity_id ==
+                      'input_boolean.prc_runoff_volume_1200' }}
+                sequence:
+                  - target:
+                      entity_id:
+                        - input_boolean.prc_runoff_volume_650
+                        - input_boolean.prc_runoff_volume_750
+                        - input_boolean.prc_runoff_volume_1050
+                        - input_boolean.prc_runoff_volume_1100
+                    action: input_boolean.turn_off
+                  - target:
+                      entity_id: input_number.prc_wort_volume_required
+                    data:
+                      value: 1200
+                    action: input_number.set_value
+      - conditions:
+          - condition: trigger
+            id: volume_changed
+        sequence:
+          - action: system_log.write
+            data:
+              message: >-
+                Sparge Controller: Volume preset changed to {{
+                states('input_number.prc_wort_volume_required') }}L -
+                Recalculating all steps
+              level: info
+          - target:
+              entity_id: input_number.prc_runoff_wort_calculated_volume_step01
+            data:
+              value: >-
+                {{ (states('input_number.prc_wort_volume_required') | float(0) /
+                10 * 1) | int(0) }}
+            action: input_number.set_value
+          - target:
+              entity_id: input_number.prc_runoff_wort_calculated_volume_step02
+            data:
+              value: >-
+                {{ (states('input_number.prc_wort_volume_required') | float(0) /
+                10 * 2) | int(0) }}
+            action: input_number.set_value
+          - target:
+              entity_id: input_number.prc_runoff_wort_calculated_volume_step03
+            data:
+              value: >-
+                {{ (states('input_number.prc_wort_volume_required') | float(0) /
+                10 * 3) | int(0) }}
+            action: input_number.set_value
+          - target:
+              entity_id: input_number.prc_runoff_wort_calculated_volume_step04
+            data:
+              value: >-
+                {{ (states('input_number.prc_wort_volume_required') | float(0) /
+                10 * 4) | int(0) }}
+            action: input_number.set_value
+          - target:
+              entity_id: input_number.prc_runoff_wort_calculated_volume_step05
+            data:
+              value: >-
+                {{ (states('input_number.prc_wort_volume_required') | float(0) /
+                10 * 5) | int(0) }}
+            action: input_number.set_value
+          - target:
+              entity_id: input_number.prc_runoff_wort_calculated_volume_step06
+            data:
+              value: >-
+                {{ (states('input_number.prc_wort_volume_required') | float(0) /
+                10 * 6) | int(0) }}
+            action: input_number.set_value
+          - target:
+              entity_id: input_number.prc_runoff_wort_calculated_volume_step07
+            data:
+              value: >-
+                {{ (states('input_number.prc_wort_volume_required') | float(0) /
+                10 * 7) | int(0) }}
+            action: input_number.set_value
+          - target:
+              entity_id: input_number.prc_runoff_wort_calculated_volume_step08
+            data:
+              value: >-
+                {{ (states('input_number.prc_wort_volume_required') | float(0) /
+                10 * 8) | int(0) }}
+            action: input_number.set_value
+          - target:
+              entity_id: input_number.prc_runoff_wort_calculated_volume_step09
+            data:
+              value: >-
+                {{ (states('input_number.prc_wort_volume_required') | float(0) /
+                10 * 9) | int(0) }}
+            action: input_number.set_value
+          - target:
+              entity_id: input_number.prc_runoff_wort_calculated_volume_step10
+            data:
+              value: "{{ states('input_number.prc_wort_volume_required') | int(0) }}"
+            action: input_number.set_value
+      - conditions:
+          - condition: trigger
+            id: volume_check
+          - condition: template
+            value_template: >-
+              {{ states('sensor.prct_current_sparge_flow_volume') not in
+              ['unavailable', 'unknown'] }}
+          - condition: template
+            value_template: >-
+              {{ states('input_number.prc_wort_volume_required') | int(0) <=
+              1300 }}
+        sequence:
+          - choose:
+              - conditions:
+                  - condition: state
+                    entity_id: input_boolean.prc_mashout_step01
+                    state: "on"
+                  - condition: template
+                    value_template: >
+                      {% set current_vol =
+                      states('sensor.prct_current_sparge_flow_volume') | int(0)
+                      %} {% set total_vol =
+                      states('input_number.prc_wort_volume_required') | int(0)
+                      %} {% set current_step =
+                      states('input_number.prc_mashout_current_step') | int(0)
+                      %} {% set steps_remaining = 10 - current_step %} {% if
+                      steps_remaining <= 0 or total_vol <= current_vol %}
+                        false
+                      {% else %}
+                        {% set vol_per_step = ((total_vol - current_vol) / steps_remaining) | int(0) %}
+                        {% set next_trigger = current_vol + vol_per_step %}
+                        {{ current_vol >= next_trigger }}
+                      {% endif %}
+                sequence:
+                  - variables:
+                      current_date: "{{ now() }}"
+                      current_month: "{{ now().month }}"
+                      current_day: "{{ now().day }}"
+                      current_hour: "{{ now().hour }}"
+                      creation_date: 31 Dec 2025
+                      days_from_new_year: |
+                        {% if now().month == 12 and now().day >= 27 %}
+                          {{ now().day - 31 }}
+                        {% elif now().month == 1 and now().day <= 5 %}
+                          {{ now().day }}
+                        {% else %}
+                          999
+                        {% endif %}
+                  - choose:
+                      - conditions:
+                          - condition: template
+                            value_template: "{{ current_month == 12 and current_day == 31 }}"
+                        sequence:
+                          - action: persistent_notification.create
+                            data:
+                              title: 🎆 NYE BREWING LEGEND DETECTED 🎆
+                              message: >
+                                You are a FUCKING NYE LEGEND for brewing right
+                                now! 🍺
+
+                                Seriously though... go home and see your family.
+                                The sparge can wait. They can't.
+
+                                - Andrew
+
+                                P.S. Fine, finish THIS batch... but then GO
+                                HOME! 🎊
+                              notification_id: nye_legend_alert
+                          - action: system_log.write
+                            data:
+                              message: >
+                                🎆🔥 NYE LEGEND ALERT 🔥🎆 Someone is actually
+                                brewing on New Year's Eve at {{
+                                now().strftime('%H:%M:%S') }}! Step 2 activated
+                                at {{
+                                states('sensor.prct_current_sparge_flow_volume')
+                                }}L. This brewer deserves a medal (and should
+                                probably go see their family). 🍺 - Andrew's NYE
+                                Message from 31 Dec 2025
+                              level: critical
+                          - action: system_log.write
+                            data:
+                              message: >
+                                📜 To whoever is diving into these logs right
+                                now: Hope the brewery is absolutely kicking
+                                ass!  This message was written on {{
+                                creation_date }} by someone optimizing sparge
+                                controllers on New Year's Eve.  If you're
+                                reading this, it means the automation survived
+                                and you're probably brewing something amazing. 
+                                Happy New Year from the past! May your
+                                efficiency be high and your downtimes be low!
+                                🍺✨ (P.S. - If you found this, you deserve a
+                                beer. Go grab one.) 🎆
+                              level: info
+                      - conditions:
+                          - condition: template
+                            value_template: >-
+                              {{ days_from_new_year | int >= -4 and
+                              days_from_new_year | int <= 5 }}
+                        sequence:
+                          - action: system_log.write
+                            data:
+                              message: >
+                                🎆🍺 HAPPY NEW YEAR from the Sparge Controller!
+                                🍺🎆 Step 2 activated at {{
+                                states('sensor.prct_current_sparge_flow_volume')
+                                }}L. May your {{ now().year }} be filled with
+                                perfect sparges and flawless brews! Cheers to
+                                another year of brewing excellence! 🎊
+                              level: warning
+                          - action: system_log.write
+                            data:
+                              message: >
+                                📜 To whoever is diving into these logs right
+                                now: Hope the brewery is absolutely kicking
+                                ass!  This message was written on {{
+                                creation_date }} by someone optimizing sparge
+                                controllers on New Year's Eve.  If you're
+                                reading this, it means the automation survived
+                                and you're probably brewing something amazing. 
+                                Happy New Year from the past! May your
+                                efficiency be high and your downtimes be low!
+                                🍺✨ (P.S. - If you found this, you deserve a
+                                beer. Go grab one.) 🎆
+                              level: info
+                  - action: system_log.write
+                    data:
+                      message: >-
+                        Sparge Controller: Volume {{
+                        states('sensor.prct_current_sparge_flow_volume') }}L
+                        reached - Progressing Step 1 → 2
+                      level: info
+                  - target:
+                      entity_id: input_boolean.prc_mashout_step02
+                    action: input_boolean.turn_on
+              - conditions:
+                  - condition: state
+                    entity_id: input_boolean.prc_mashout_step02
+                    state: "on"
+                  - condition: template
+                    value_template: >
+                      {% set current_vol =
+                      states('sensor.prct_current_sparge_flow_volume') | int(0)
+                      %} {% set total_vol =
+                      states('input_number.prc_wort_volume_required') | int(0)
+                      %} {% set current_step =
+                      states('input_number.prc_mashout_current_step') | int(0)
+                      %} {% set steps_remaining = 10 - current_step %} {% if
+                      steps_remaining <= 0 or total_vol <= current_vol %}
+                        false
+                      {% else %}
+                        {% set vol_per_step = ((total_vol - current_vol) / steps_remaining) | int(0) %}
+                        {% set next_trigger = current_vol + vol_per_step %}
+                        {{ current_vol >= next_trigger }}
+                      {% endif %}
+                sequence:
+                  - action: system_log.write
+                    data:
+                      message: >-
+                        Sparge Controller: Volume {{
+                        states('sensor.prct_current_sparge_flow_volume') }}L
+                        reached - Progressing Step 2 → 3
+                      level: info
+                  - target:
+                      entity_id: input_boolean.prc_mashout_step03
+                    action: input_boolean.turn_on
+              - conditions:
+                  - condition: state
+                    entity_id: input_boolean.prc_mashout_step03
+                    state: "on"
+                  - condition: template
+                    value_template: >
+                      {% set current_vol =
+                      states('sensor.prct_current_sparge_flow_volume') | int(0)
+                      %} {% set total_vol =
+                      states('input_number.prc_wort_volume_required') | int(0)
+                      %} {% set current_step =
+                      states('input_number.prc_mashout_current_step') | int(0)
+                      %} {% set steps_remaining = 10 - current_step %} {% if
+                      steps_remaining <= 0 or total_vol <= current_vol %}
+                        false
+                      {% else %}
+                        {% set vol_per_step = ((total_vol - current_vol) / steps_remaining) | int(0) %}
+                        {% set next_trigger = current_vol + vol_per_step %}
+                        {{ current_vol >= next_trigger }}
+                      {% endif %}
+                sequence:
+                  - action: system_log.write
+                    data:
+                      message: >-
+                        Sparge Controller: Volume {{
+                        states('sensor.prct_current_sparge_flow_volume') }}L
+                        reached - Progressing Step 3 → 4
+                      level: info
+                  - target:
+                      entity_id: input_boolean.prc_mashout_step04
+                    action: input_boolean.turn_on
+              - conditions:
+                  - condition: state
+                    entity_id: input_boolean.prc_mashout_step04
+                    state: "on"
+                  - condition: template
+                    value_template: >
+                      {% set current_vol =
+                      states('sensor.prct_current_sparge_flow_volume') | int(0)
+                      %} {% set total_vol =
+                      states('input_number.prc_wort_volume_required') | int(0)
+                      %} {% set current_step =
+                      states('input_number.prc_mashout_current_step') | int(0)
+                      %} {% set steps_remaining = 10 - current_step %} {% if
+                      steps_remaining <= 0 or total_vol <= current_vol %}
+                        false
+                      {% else %}
+                        {% set vol_per_step = ((total_vol - current_vol) / steps_remaining) | int(0) %}
+                        {% set next_trigger = current_vol + vol_per_step %}
+                        {{ current_vol >= next_trigger }}
+                      {% endif %}
+                sequence:
+                  - action: system_log.write
+                    data:
+                      message: >-
+                        Sparge Controller: Volume {{
+                        states('sensor.prct_current_sparge_flow_volume') }}L
+                        reached - Progressing Step 4 → 5
+                      level: info
+                  - target:
+                      entity_id: input_boolean.prc_mashout_step05
+                    action: input_boolean.turn_on
+              - conditions:
+                  - condition: state
+                    entity_id: input_boolean.prc_mashout_step05
+                    state: "on"
+                  - condition: template
+                    value_template: >
+                      {% set current_vol =
+                      states('sensor.prct_current_sparge_flow_volume') | int(0)
+                      %} {% set total_vol =
+                      states('input_number.prc_wort_volume_required') | int(0)
+                      %} {% set current_step =
+                      states('input_number.prc_mashout_current_step') | int(0)
+                      %} {% set steps_remaining = 10 - current_step %} {% if
+                      steps_remaining <= 0 or total_vol <= current_vol %}
+                        false
+                      {% else %}
+                        {% set vol_per_step = ((total_vol - current_vol) / steps_remaining) | int(0) %}
+                        {% set next_trigger = current_vol + vol_per_step %}
+                        {{ current_vol >= next_trigger }}
+                      {% endif %}
+                sequence:
+                  - action: system_log.write
+                    data:
+                      message: >-
+                        Sparge Controller: Volume {{
+                        states('sensor.prct_current_sparge_flow_volume') }}L
+                        reached - Progressing Step 5 → 6
+                      level: info
+                  - target:
+                      entity_id: input_boolean.prc_mashout_step06
+                    action: input_boolean.turn_on
+              - conditions:
+                  - condition: state
+                    entity_id: input_boolean.prc_mashout_step06
+                    state: "on"
+                  - condition: template
+                    value_template: >
+                      {% set current_vol =
+                      states('sensor.prct_current_sparge_flow_volume') | int(0)
+                      %} {% set total_vol =
+                      states('input_number.prc_wort_volume_required') | int(0)
+                      %} {% set current_step =
+                      states('input_number.prc_mashout_current_step') | int(0)
+                      %} {% set steps_remaining = 10 - current_step %} {% if
+                      steps_remaining <= 0 or total_vol <= current_vol %}
+                        false
+                      {% else %}
+                        {% set vol_per_step = ((total_vol - current_vol) / steps_remaining) | int(0) %}
+                        {% set next_trigger = current_vol + vol_per_step %}
+                        {{ current_vol >= next_trigger }}
+                      {% endif %}
+                sequence:
+                  - action: system_log.write
+                    data:
+                      message: >-
+                        Sparge Controller: Volume {{
+                        states('sensor.prct_current_sparge_flow_volume') }}L
+                        reached - Progressing Step 6 → 7
+                      level: info
+                  - target:
+                      entity_id: input_boolean.prc_mashout_step07
+                    action: input_boolean.turn_on
+              - conditions:
+                  - condition: state
+                    entity_id: input_boolean.prc_mashout_step07
+                    state: "on"
+                  - condition: template
+                    value_template: >
+                      {% set current_vol =
+                      states('sensor.prct_current_sparge_flow_volume') | int(0)
+                      %} {% set total_vol =
+                      states('input_number.prc_wort_volume_required') | int(0)
+                      %} {% set current_step =
+                      states('input_number.prc_mashout_current_step') | int(0)
+                      %} {% set steps_remaining = 10 - current_step %} {% if
+                      steps_remaining <= 0 or total_vol <= current_vol %}
+                        false
+                      {% else %}
+                        {% set vol_per_step = ((total_vol - current_vol) / steps_remaining) | int(0) %}
+                        {% set next_trigger = current_vol + vol_per_step %}
+                        {{ current_vol >= next_trigger }}
+                      {% endif %}
+                sequence:
+                  - action: system_log.write
+                    data:
+                      message: >-
+                        Sparge Controller: Volume {{
+                        states('sensor.prct_current_sparge_flow_volume') }}L
+                        reached - Progressing Step 7 → 8
+                      level: info
+                  - target:
+                      entity_id: input_boolean.prc_mashout_step08
+                    action: input_boolean.turn_on
+              - conditions:
+                  - condition: state
+                    entity_id: input_boolean.prc_mashout_step08
+                    state: "on"
+                  - condition: template
+                    value_template: >
+                      {% set current_vol =
+                      states('sensor.prct_current_sparge_flow_volume') | int(0)
+                      %} {% set total_vol =
+                      states('input_number.prc_wort_volume_required') | int(0)
+                      %} {% set current_step =
+                      states('input_number.prc_mashout_current_step') | int(0)
+                      %} {% set steps_remaining = 10 - current_step %} {% if
+                      steps_remaining <= 0 or total_vol <= current_vol %}
+                        false
+                      {% else %}
+                        {% set vol_per_step = ((total_vol - current_vol) / steps_remaining) | int(0) %}
+                        {% set next_trigger = current_vol + vol_per_step %}
+                        {{ current_vol >= next_trigger }}
+                      {% endif %}
+                sequence:
+                  - action: system_log.write
+                    data:
+                      message: >-
+                        Sparge Controller: Volume {{
+                        states('sensor.prct_current_sparge_flow_volume') }}L
+                        reached - Progressing Step 8 → 9
+                      level: info
+                  - target:
+                      entity_id: input_boolean.prc_mashout_step09
+                    action: input_boolean.turn_on
+              - conditions:
+                  - condition: state
+                    entity_id: input_boolean.prc_mashout_step09
+                    state: "on"
+                  - condition: template
+                    value_template: >
+                      {% set current_vol =
+                      states('sensor.prct_current_sparge_flow_volume') | int(0)
+                      %} {% set total_vol =
+                      states('input_number.prc_wort_volume_required') | int(0)
+                      %} {% set current_step =
+                      states('input_number.prc_mashout_current_step') | int(0)
+                      %} {% set steps_remaining = 10 - current_step %} {% if
+                      steps_remaining <= 0 or total_vol <= current_vol %}
+                        false
+                      {% else %}
+                        {% set vol_per_step = ((total_vol - current_vol) / steps_remaining) | int(0) %}
+                        {% set next_trigger = current_vol + vol_per_step %}
+                        {{ current_vol >= next_trigger }}
+                      {% endif %}
+                sequence:
+                  - action: system_log.write
+                    data:
+                      message: >-
+                        Sparge Controller: Volume {{
+                        states('sensor.prct_current_sparge_flow_volume') }}L
+                        reached - Progressing Step 9 → 10
+                      level: info
+                  - target:
+                      entity_id: input_boolean.prc_mashout_step10
+                    action: input_boolean.turn_on
+              - conditions:
+                  - condition: state
+                    entity_id: input_boolean.prc_mashout_step10
+                    state: "on"
+                  - condition: template
+                    value_template: >
+                      {{ states('sensor.prct_current_sparge_flow_volume') |
+                      int(0) >= 
+                         states('input_number.prc_wort_volume_required') | int(0) }}
+                sequence:
+                  - action: system_log.write
+                    data:
+                      message: >-
+                        Sparge Controller: Target volume {{
+                        states('input_number.prc_wort_volume_required') }}L
+                        reached - Completing sparge, all steps OFF
+                      level: warning
+                  - target:
+                      entity_id:
+                        - input_boolean.prc_mashout_step01
+                        - input_boolean.prc_mashout_step02
+                        - input_boolean.prc_mashout_step03
+                        - input_boolean.prc_mashout_step04
+                        - input_boolean.prc_mashout_step05
+                        - input_boolean.prc_mashout_step06
+                        - input_boolean.prc_mashout_step07
+                        - input_boolean.prc_mashout_step08
+                        - input_boolean.prc_mashout_step09
+                        - input_boolean.prc_mashout_step10
+                    action: input_boolean.turn_off
+      - conditions:
+          - condition: template
+            value_template: "{{ trigger.entity_id == 'input_boolean.prc_mashout_step01' }}"
+        sequence:
+          - action: system_log.write
+            data:
+              message: >-
+                Sparge Controller: Manual selection - Step 01 activated (Current
+                Volume: {{ states('sensor.prct_current_sparge_flow_volume') }}L)
+              level: info
+          - target:
+              entity_id:
+                - input_boolean.prc_mashout_step02
+                - input_boolean.prc_mashout_step03
+                - input_boolean.prc_mashout_step04
+                - input_boolean.prc_mashout_step05
+                - input_boolean.prc_mashout_step06
+                - input_boolean.prc_mashout_step07
+                - input_boolean.prc_mashout_step08
+                - input_boolean.prc_mashout_step09
+                - input_boolean.prc_mashout_step10
+            action: input_boolean.turn_off
+          - choose:
+              - conditions:
+                  - condition: state
+                    entity_id: input_boolean.prc_sparge_runoff
+                    state: "on"
+                sequence:
+                  - target:
+                      entity_id: input_number.hlt_speed
+                    data:
+                      value: >-
+                        {{
+                        states('input_number.prc_runoff_hlt_pump_speed_step01')
+                        }}
+                    action: input_number.set_value
+                  - target:
+                      entity_id: input_number.prc_wort_pump_speed
+                    data:
+                      value: >-
+                        {{
+                        states('input_number.prc_runoff_wort_pump_speed_step01')
+                        }}
+                    action: input_number.set_value
+                  - action: system_log.write
+                    data:
+                      message: >-
+                        Sparge Controller: Loaded pump speeds for Step 01 (HLT:
+                        {{
+                        states('input_number.prc_runoff_hlt_pump_speed_step01')
+                        }}, Wort: {{
+                        states('input_number.prc_runoff_wort_pump_speed_step01')
+                        }})
+                      level: info
+          - target:
+              entity_id: input_number.prc_mashout_current_step
+            data:
+              value: 1
+            action: input_number.set_value
+          - condition: template
+            value_template: >-
+              {{ states('sensor.prct_current_sparge_flow_volume') not in
+              ['unavailable', 'unknown'] }}
+          - variables:
+              total_vol: "{{ states('input_number.prc_wort_volume_required') | int(0) }}"
+              current_vol: "{{ states('sensor.prct_current_sparge_flow_volume') | int(0) }}"
+              steps_remaining: 10
+              vol_remaining: "{{ (total_vol - current_vol) | int(0) }}"
+          - condition: template
+            value_template: "{{ vol_remaining > 0 and total_vol <= 1300 }}"
+          - variables:
+              vol_per_step: "{{ (vol_remaining / steps_remaining) | int(0) }}"
+          - target:
+              entity_id: input_number.prc_runoff_wort_calculated_volume_step01
+            data:
+              value: "{{ current_vol + (vol_per_step * 1) }}"
+            action: input_number.set_value
+          - target:
+              entity_id: input_number.prc_runoff_wort_calculated_volume_step02
+            data:
+              value: "{{ current_vol + (vol_per_step * 2) }}"
+            action: input_number.set_value
+          - target:
+              entity_id: input_number.prc_runoff_wort_calculated_volume_step03
+            data:
+              value: "{{ current_vol + (vol_per_step * 3) }}"
+            action: input_number.set_value
+          - target:
+              entity_id: input_number.prc_runoff_wort_calculated_volume_step04
+            data:
+              value: "{{ current_vol + (vol_per_step * 4) }}"
+            action: input_number.set_value
+          - target:
+              entity_id: input_number.prc_runoff_wort_calculated_volume_step05
+            data:
+              value: "{{ current_vol + (vol_per_step * 5) }}"
+            action: input_number.set_value
+          - target:
+              entity_id: input_number.prc_runoff_wort_calculated_volume_step06
+            data:
+              value: "{{ current_vol + (vol_per_step * 6) }}"
+            action: input_number.set_value
+          - target:
+              entity_id: input_number.prc_runoff_wort_calculated_volume_step07
+            data:
+              value: "{{ current_vol + (vol_per_step * 7) }}"
+            action: input_number.set_value
+          - target:
+              entity_id: input_number.prc_runoff_wort_calculated_volume_step08
+            data:
+              value: "{{ current_vol + (vol_per_step * 8) }}"
+            action: input_number.set_value
+          - target:
+              entity_id: input_number.prc_runoff_wort_calculated_volume_step09
+            data:
+              value: "{{ current_vol + (vol_per_step * 9) }}"
+            action: input_number.set_value
+          - target:
+              entity_id: input_number.prc_runoff_wort_calculated_volume_step10
+            data:
+              value: "{{ total_vol }}"
+            action: input_number.set_value
+      - conditions:
+          - condition: template
+            value_template: "{{ trigger.entity_id == 'input_boolean.prc_mashout_step02' }}"
+        sequence:
+          - action: system_log.write
+            data:
+              message: >-
+                Sparge Controller: Manual selection - Step 02 activated (Current
+                Volume: {{ states('sensor.prct_current_sparge_flow_volume') }}L)
+              level: info
+          - target:
+              entity_id:
+                - input_boolean.prc_mashout_step01
+                - input_boolean.prc_mashout_step03
+                - input_boolean.prc_mashout_step04
+                - input_boolean.prc_mashout_step05
+                - input_boolean.prc_mashout_step06
+                - input_boolean.prc_mashout_step07
+                - input_boolean.prc_mashout_step08
+                - input_boolean.prc_mashout_step09
+                - input_boolean.prc_mashout_step10
+            action: input_boolean.turn_off
+          - choose:
+              - conditions:
+                  - condition: state
+                    entity_id: input_boolean.prc_sparge_runoff
+                    state: "on"
+                sequence:
+                  - target:
+                      entity_id: input_number.hlt_speed
+                    data:
+                      value: >-
+                        {{
+                        states('input_number.prc_runoff_hlt_pump_speed_step02')
+                        }}
+                    action: input_number.set_value
+                  - target:
+                      entity_id: input_number.prc_wort_pump_speed
+                    data:
+                      value: >-
+                        {{
+                        states('input_number.prc_runoff_wort_pump_speed_step02')
+                        }}
+                    action: input_number.set_value
+                  - action: system_log.write
+                    data:
+                      message: >-
+                        Sparge Controller: Loaded pump speeds for Step 02 (HLT:
+                        {{
+                        states('input_number.prc_runoff_hlt_pump_speed_step02')
+                        }}, Wort: {{
+                        states('input_number.prc_runoff_wort_pump_speed_step02')
+                        }})
+                      level: info
+          - target:
+              entity_id: input_number.prc_mashout_current_step
+            data:
+              value: 2
+            action: input_number.set_value
+          - condition: template
+            value_template: >-
+              {{ states('sensor.prct_current_sparge_flow_volume') not in
+              ['unavailable', 'unknown'] }}
+          - variables:
+              total_vol: "{{ states('input_number.prc_wort_volume_required') | int(0) }}"
+              current_vol: "{{ states('sensor.prct_current_sparge_flow_volume') | int(0) }}"
+              steps_remaining: 9
+              vol_remaining: "{{ (total_vol - current_vol) | int(0) }}"
+          - condition: template
+            value_template: "{{ vol_remaining > 0 and total_vol <= 1300 }}"
+          - variables:
+              vol_per_step: "{{ (vol_remaining / steps_remaining) | int(0) }}"
+          - target:
+              entity_id: input_number.prc_runoff_wort_calculated_volume_step02
+            data:
+              value: "{{ current_vol + (vol_per_step * 1) }}"
+            action: input_number.set_value
+          - target:
+              entity_id: input_number.prc_runoff_wort_calculated_volume_step03
+            data:
+              value: "{{ current_vol + (vol_per_step * 2) }}"
+            action: input_number.set_value
+          - target:
+              entity_id: input_number.prc_runoff_wort_calculated_volume_step04
+            data:
+              value: "{{ current_vol + (vol_per_step * 3) }}"
+            action: input_number.set_value
+          - target:
+              entity_id: input_number.prc_runoff_wort_calculated_volume_step05
+            data:
+              value: "{{ current_vol + (vol_per_step * 4) }}"
+            action: input_number.set_value
+          - target:
+              entity_id: input_number.prc_runoff_wort_calculated_volume_step06
+            data:
+              value: "{{ current_vol + (vol_per_step * 5) }}"
+            action: input_number.set_value
+          - target:
+              entity_id: input_number.prc_runoff_wort_calculated_volume_step07
+            data:
+              value: "{{ current_vol + (vol_per_step * 6) }}"
+            action: input_number.set_value
+          - target:
+              entity_id: input_number.prc_runoff_wort_calculated_volume_step08
+            data:
+              value: "{{ current_vol + (vol_per_step * 7) }}"
+            action: input_number.set_value
+          - target:
+              entity_id: input_number.prc_runoff_wort_calculated_volume_step09
+            data:
+              value: "{{ current_vol + (vol_per_step * 8) }}"
+            action: input_number.set_value
+          - target:
+              entity_id: input_number.prc_runoff_wort_calculated_volume_step10
+            data:
+              value: "{{ total_vol }}"
+            action: input_number.set_value
+      - conditions:
+          - condition: template
+            value_template: "{{ trigger.entity_id == 'input_boolean.prc_mashout_step03' }}"
+        sequence:
+          - action: system_log.write
+            data:
+              message: >-
+                Sparge Controller: Manual selection - Step 03 activated (Current
+                Volume: {{ states('sensor.prct_current_sparge_flow_volume') }}L)
+              level: info
+          - target:
+              entity_id:
+                - input_boolean.prc_mashout_step01
+                - input_boolean.prc_mashout_step02
+                - input_boolean.prc_mashout_step04
+                - input_boolean.prc_mashout_step05
+                - input_boolean.prc_mashout_step06
+                - input_boolean.prc_mashout_step07
+                - input_boolean.prc_mashout_step08
+                - input_boolean.prc_mashout_step09
+                - input_boolean.prc_mashout_step10
+            action: input_boolean.turn_off
+          - choose:
+              - conditions:
+                  - condition: state
+                    entity_id: input_boolean.prc_sparge_runoff
+                    state: "on"
+                sequence:
+                  - target:
+                      entity_id: input_number.hlt_speed
+                    data:
+                      value: >-
+                        {{
+                        states('input_number.prc_runoff_hlt_pump_speed_step03')
+                        }}
+                    action: input_number.set_value
+                  - target:
+                      entity_id: input_number.prc_wort_pump_speed
+                    data:
+                      value: >-
+                        {{
+                        states('input_number.prc_runoff_wort_pump_speed_step03')
+                        }}
+                    action: input_number.set_value
+                  - action: system_log.write
+                    data:
+                      message: >-
+                        Sparge Controller: Loaded pump speeds for Step 03 (HLT:
+                        {{
+                        states('input_number.prc_runoff_hlt_pump_speed_step03')
+                        }}, Wort: {{
+                        states('input_number.prc_runoff_wort_pump_speed_step03')
+                        }})
+                      level: info
+          - target:
+              entity_id: input_number.prc_mashout_current_step
+            data:
+              value: 3
+            action: input_number.set_value
+          - condition: template
+            value_template: >-
+              {{ states('sensor.prct_current_sparge_flow_volume') not in
+              ['unavailable', 'unknown'] }}
+          - variables:
+              total_vol: "{{ states('input_number.prc_wort_volume_required') | int(0) }}"
+              current_vol: "{{ states('sensor.prct_current_sparge_flow_volume') | int(0) }}"
+              steps_remaining: 8
+              vol_remaining: "{{ (total_vol - current_vol) | int(0) }}"
+          - condition: template
+            value_template: "{{ vol_remaining > 0 and total_vol <= 1300 }}"
+          - variables:
+              vol_per_step: "{{ (vol_remaining / steps_remaining) | int(0) }}"
+          - target:
+              entity_id: input_number.prc_runoff_wort_calculated_volume_step03
+            data:
+              value: "{{ current_vol + (vol_per_step * 1) }}"
+            action: input_number.set_value
+          - target:
+              entity_id: input_number.prc_runoff_wort_calculated_volume_step04
+            data:
+              value: "{{ current_vol + (vol_per_step * 2) }}"
+            action: input_number.set_value
+          - target:
+              entity_id: input_number.prc_runoff_wort_calculated_volume_step05
+            data:
+              value: "{{ current_vol + (vol_per_step * 3) }}"
+            action: input_number.set_value
+          - target:
+              entity_id: input_number.prc_runoff_wort_calculated_volume_step06
+            data:
+              value: "{{ current_vol + (vol_per_step * 4) }}"
+            action: input_number.set_value
+          - target:
+              entity_id: input_number.prc_runoff_wort_calculated_volume_step07
+            data:
+              value: "{{ current_vol + (vol_per_step * 5) }}"
+            action: input_number.set_value
+          - target:
+              entity_id: input_number.prc_runoff_wort_calculated_volume_step08
+            data:
+              value: "{{ current_vol + (vol_per_step * 6) }}"
+            action: input_number.set_value
+          - target:
+              entity_id: input_number.prc_runoff_wort_calculated_volume_step09
+            data:
+              value: "{{ current_vol + (vol_per_step * 7) }}"
+            action: input_number.set_value
+          - target:
+              entity_id: input_number.prc_runoff_wort_calculated_volume_step10
+            data:
+              value: "{{ total_vol }}"
+            action: input_number.set_value
+      - conditions:
+          - condition: template
+            value_template: "{{ trigger.entity_id == 'input_boolean.prc_mashout_step04' }}"
+        sequence:
+          - action: system_log.write
+            data:
+              message: >-
+                Sparge Controller: Manual selection - Step 04 activated (Current
+                Volume: {{ states('sensor.prct_current_sparge_flow_volume') }}L)
+              level: info
+          - target:
+              entity_id:
+                - input_boolean.prc_mashout_step01
+                - input_boolean.prc_mashout_step02
+                - input_boolean.prc_mashout_step03
+                - input_boolean.prc_mashout_step05
+                - input_boolean.prc_mashout_step06
+                - input_boolean.prc_mashout_step07
+                - input_boolean.prc_mashout_step08
+                - input_boolean.prc_mashout_step09
+                - input_boolean.prc_mashout_step10
+            action: input_boolean.turn_off
+          - choose:
+              - conditions:
+                  - condition: state
+                    entity_id: input_boolean.prc_sparge_runoff
+                    state: "on"
+                sequence:
+                  - target:
+                      entity_id: input_number.hlt_speed
+                    data:
+                      value: >-
+                        {{
+                        states('input_number.prc_runoff_hlt_pump_speed_step04')
+                        }}
+                    action: input_number.set_value
+                  - target:
+                      entity_id: input_number.prc_wort_pump_speed
+                    data:
+                      value: >-
+                        {{
+                        states('input_number.prc_runoff_wort_pump_speed_step04')
+                        }}
+                    action: input_number.set_value
+                  - action: system_log.write
+                    data:
+                      message: >-
+                        Sparge Controller: Loaded pump speeds for Step 04 (HLT:
+                        {{
+                        states('input_number.prc_runoff_hlt_pump_speed_step04')
+                        }}, Wort: {{
+                        states('input_number.prc_runoff_wort_pump_speed_step04')
+                        }})
+                      level: info
+          - target:
+              entity_id: input_number.prc_mashout_current_step
+            data:
+              value: 4
+            action: input_number.set_value
+          - condition: template
+            value_template: >-
+              {{ states('sensor.prct_current_sparge_flow_volume') not in
+              ['unavailable', 'unknown'] }}
+          - variables:
+              total_vol: "{{ states('input_number.prc_wort_volume_required') | int(0) }}"
+              current_vol: "{{ states('sensor.prct_current_sparge_flow_volume') | int(0) }}"
+              steps_remaining: 7
+              vol_remaining: "{{ (total_vol - current_vol) | int(0) }}"
+          - condition: template
+            value_template: "{{ vol_remaining > 0 and total_vol <= 1300 }}"
+          - variables:
+              vol_per_step: "{{ (vol_remaining / steps_remaining) | int(0) }}"
+          - target:
+              entity_id: input_number.prc_runoff_wort_calculated_volume_step04
+            data:
+              value: "{{ current_vol + (vol_per_step * 1) }}"
+            action: input_number.set_value
+          - target:
+              entity_id: input_number.prc_runoff_wort_calculated_volume_step05
+            data:
+              value: "{{ current_vol + (vol_per_step * 2) }}"
+            action: input_number.set_value
+          - target:
+              entity_id: input_number.prc_runoff_wort_calculated_volume_step06
+            data:
+              value: "{{ current_vol + (vol_per_step * 3) }}"
+            action: input_number.set_value
+          - target:
+              entity_id: input_number.prc_runoff_wort_calculated_volume_step07
+            data:
+              value: "{{ current_vol + (vol_per_step * 4) }}"
+            action: input_number.set_value
+          - target:
+              entity_id: input_number.prc_runoff_wort_calculated_volume_step08
+            data:
+              value: "{{ current_vol + (vol_per_step * 5) }}"
+            action: input_number.set_value
+          - target:
+              entity_id: input_number.prc_runoff_wort_calculated_volume_step09
+            data:
+              value: "{{ current_vol + (vol_per_step * 6) }}"
+            action: input_number.set_value
+          - target:
+              entity_id: input_number.prc_runoff_wort_calculated_volume_step10
+            data:
+              value: "{{ total_vol }}"
+            action: input_number.set_value
+      - conditions:
+          - condition: template
+            value_template: "{{ trigger.entity_id == 'input_boolean.prc_mashout_step05' }}"
+        sequence:
+          - action: system_log.write
+            data:
+              message: >-
+                Sparge Controller: Manual selection - Step 05 activated (Current
+                Volume: {{ states('sensor.prct_current_sparge_flow_volume') }}L)
+              level: info
+          - target:
+              entity_id:
+                - input_boolean.prc_mashout_step01
+                - input_boolean.prc_mashout_step02
+                - input_boolean.prc_mashout_step03
+                - input_boolean.prc_mashout_step04
+                - input_boolean.prc_mashout_step06
+                - input_boolean.prc_mashout_step07
+                - input_boolean.prc_mashout_step08
+                - input_boolean.prc_mashout_step09
+                - input_boolean.prc_mashout_step10
+            action: input_boolean.turn_off
+          - choose:
+              - conditions:
+                  - condition: state
+                    entity_id: input_boolean.prc_sparge_runoff
+                    state: "on"
+                sequence:
+                  - target:
+                      entity_id: input_number.hlt_speed
+                    data:
+                      value: >-
+                        {{
+                        states('input_number.prc_runoff_hlt_pump_speed_step05')
+                        }}
+                    action: input_number.set_value
+                  - target:
+                      entity_id: input_number.prc_wort_pump_speed
+                    data:
+                      value: >-
+                        {{
+                        states('input_number.prc_runoff_wort_pump_speed_step05')
+                        }}
+                    action: input_number.set_value
+                  - action: system_log.write
+                    data:
+                      message: >-
+                        Sparge Controller: Loaded pump speeds for Step 05 (HLT:
+                        {{
+                        states('input_number.prc_runoff_hlt_pump_speed_step05')
+                        }}, Wort: {{
+                        states('input_number.prc_runoff_wort_pump_speed_step05')
+                        }})
+                      level: info
+          - target:
+              entity_id: input_number.prc_mashout_current_step
+            data:
+              value: 5
+            action: input_number.set_value
+          - condition: template
+            value_template: >-
+              {{ states('sensor.prct_current_sparge_flow_volume') not in
+              ['unavailable', 'unknown'] }}
+          - variables:
+              total_vol: "{{ states('input_number.prc_wort_volume_required') | int(0) }}"
+              current_vol: "{{ states('sensor.prct_current_sparge_flow_volume') | int(0) }}"
+              steps_remaining: 6
+              vol_remaining: "{{ (total_vol - current_vol) | int(0) }}"
+          - condition: template
+            value_template: "{{ vol_remaining > 0 and total_vol <= 1300 }}"
+          - variables:
+              vol_per_step: "{{ (vol_remaining / steps_remaining) | int(0) }}"
+          - target:
+              entity_id: input_number.prc_runoff_wort_calculated_volume_step05
+            data:
+              value: "{{ current_vol + (vol_per_step * 1) }}"
+            action: input_number.set_value
+          - target:
+              entity_id: input_number.prc_runoff_wort_calculated_volume_step06
+            data:
+              value: "{{ current_vol + (vol_per_step * 2) }}"
+            action: input_number.set_value
+          - target:
+              entity_id: input_number.prc_runoff_wort_calculated_volume_step07
+            data:
+              value: "{{ current_vol + (vol_per_step * 3) }}"
+            action: input_number.set_value
+          - target:
+              entity_id: input_number.prc_runoff_wort_calculated_volume_step08
+            data:
+              value: "{{ current_vol + (vol_per_step * 4) }}"
+            action: input_number.set_value
+          - target:
+              entity_id: input_number.prc_runoff_wort_calculated_volume_step09
+            data:
+              value: "{{ current_vol + (vol_per_step * 5) }}"
+            action: input_number.set_value
+          - target:
+              entity_id: input_number.prc_runoff_wort_calculated_volume_step10
+            data:
+              value: "{{ total_vol }}"
+            action: input_number.set_value
+      - conditions:
+          - condition: template
+            value_template: "{{ trigger.entity_id == 'input_boolean.prc_mashout_step06' }}"
+        sequence:
+          - action: system_log.write
+            data:
+              message: >-
+                Sparge Controller: Manual selection - Step 06 activated (Current
+                Volume: {{ states('sensor.prct_current_sparge_flow_volume') }}L)
+              level: info
+          - target:
+              entity_id:
+                - input_boolean.prc_mashout_step01
+                - input_boolean.prc_mashout_step02
+                - input_boolean.prc_mashout_step03
+                - input_boolean.prc_mashout_step04
+                - input_boolean.prc_mashout_step05
+                - input_boolean.prc_mashout_step07
+                - input_boolean.prc_mashout_step08
+                - input_boolean.prc_mashout_step09
+                - input_boolean.prc_mashout_step10
+            action: input_boolean.turn_off
+          - choose:
+              - conditions:
+                  - condition: state
+                    entity_id: input_boolean.prc_sparge_runoff
+                    state: "on"
+                sequence:
+                  - target:
+                      entity_id: input_number.hlt_speed
+                    data:
+                      value: >-
+                        {{
+                        states('input_number.prc_runoff_hlt_pump_speed_step06')
+                        }}
+                    action: input_number.set_value
+                  - target:
+                      entity_id: input_number.prc_wort_pump_speed
+                    data:
+                      value: >-
+                        {{
+                        states('input_number.prc_runoff_wort_pump_speed_step06')
+                        }}
+                    action: input_number.set_value
+                  - action: system_log.write
+                    data:
+                      message: >-
+                        Sparge Controller: Loaded pump speeds for Step 06 (HLT:
+                        {{
+                        states('input_number.prc_runoff_hlt_pump_speed_step06')
+                        }}, Wort: {{
+                        states('input_number.prc_runoff_wort_pump_speed_step06')
+                        }})
+                      level: info
+          - target:
+              entity_id: input_number.prc_mashout_current_step
+            data:
+              value: 6
+            action: input_number.set_value
+          - condition: template
+            value_template: >-
+              {{ states('sensor.prct_current_sparge_flow_volume') not in
+              ['unavailable', 'unknown'] }}
+          - variables:
+              total_vol: "{{ states('input_number.prc_wort_volume_required') | int(0) }}"
+              current_vol: "{{ states('sensor.prct_current_sparge_flow_volume') | int(0) }}"
+              steps_remaining: 5
+              vol_remaining: "{{ (total_vol - current_vol) | int(0) }}"
+          - condition: template
+            value_template: "{{ vol_remaining > 0 and total_vol <= 1300 }}"
+          - variables:
+              vol_per_step: "{{ (vol_remaining / steps_remaining) | int(0) }}"
+          - target:
+              entity_id: input_number.prc_runoff_wort_calculated_volume_step06
+            data:
+              value: "{{ current_vol + (vol_per_step * 1) }}"
+            action: input_number.set_value
+          - target:
+              entity_id: input_number.prc_runoff_wort_calculated_volume_step07
+            data:
+              value: "{{ current_vol + (vol_per_step * 2) }}"
+            action: input_number.set_value
+          - target:
+              entity_id: input_number.prc_runoff_wort_calculated_volume_step08
+            data:
+              value: "{{ current_vol + (vol_per_step * 3) }}"
+            action: input_number.set_value
+          - target:
+              entity_id: input_number.prc_runoff_wort_calculated_volume_step09
+            data:
+              value: "{{ current_vol + (vol_per_step * 4) }}"
+            action: input_number.set_value
+          - target:
+              entity_id: input_number.prc_runoff_wort_calculated_volume_step10
+            data:
+              value: "{{ total_vol }}"
+            action: input_number.set_value
+      - conditions:
+          - condition: template
+            value_template: "{{ trigger.entity_id == 'input_boolean.prc_mashout_step07' }}"
+        sequence:
+          - action: system_log.write
+            data:
+              message: >-
+                Sparge Controller: Manual selection - Step 07 activated (Current
+                Volume: {{ states('sensor.prct_current_sparge_flow_volume') }}L)
+              level: info
+          - target:
+              entity_id:
+                - input_boolean.prc_mashout_step01
+                - input_boolean.prc_mashout_step02
+                - input_boolean.prc_mashout_step03
+                - input_boolean.prc_mashout_step04
+                - input_boolean.prc_mashout_step05
+                - input_boolean.prc_mashout_step06
+                - input_boolean.prc_mashout_step08
+                - input_boolean.prc_mashout_step09
+                - input_boolean.prc_mashout_step10
+            action: input_boolean.turn_off
+          - choose:
+              - conditions:
+                  - condition: state
+                    entity_id: input_boolean.prc_sparge_runoff
+                    state: "on"
+                sequence:
+                  - target:
+                      entity_id: input_number.hlt_speed
+                    data:
+                      value: >-
+                        {{
+                        states('input_number.prc_runoff_hlt_pump_speed_step07')
+                        }}
+                    action: input_number.set_value
+                  - target:
+                      entity_id: input_number.prc_wort_pump_speed
+                    data:
+                      value: >-
+                        {{
+                        states('input_number.prc_runoff_wort_pump_speed_step07')
+                        }}
+                    action: input_number.set_value
+                  - action: system_log.write
+                    data:
+                      message: >-
+                        Sparge Controller: Loaded pump speeds for Step 07 (HLT:
+                        {{
+                        states('input_number.prc_runoff_hlt_pump_speed_step07')
+                        }}, Wort: {{
+                        states('input_number.prc_runoff_wort_pump_speed_step07')
+                        }})
+                      level: info
+          - target:
+              entity_id: input_number.prc_mashout_current_step
+            data:
+              value: 7
+            action: input_number.set_value
+          - condition: template
+            value_template: >-
+              {{ states('sensor.prct_current_sparge_flow_volume') not in
+              ['unavailable', 'unknown'] }}
+          - variables:
+              total_vol: "{{ states('input_number.prc_wort_volume_required') | int(0) }}"
+              current_vol: "{{ states('sensor.prct_current_sparge_flow_volume') | int(0) }}"
+              steps_remaining: 4
+              vol_remaining: "{{ (total_vol - current_vol) | int(0) }}"
+          - condition: template
+            value_template: "{{ vol_remaining > 0 and total_vol <= 1300 }}"
+          - variables:
+              vol_per_step: "{{ (vol_remaining / steps_remaining) | int(0) }}"
+          - target:
+              entity_id: input_number.prc_runoff_wort_calculated_volume_step07
+            data:
+              value: "{{ current_vol + (vol_per_step * 1) }}"
+            action: input_number.set_value
+          - target:
+              entity_id: input_number.prc_runoff_wort_calculated_volume_step08
+            data:
+              value: "{{ current_vol + (vol_per_step * 2) }}"
+            action: input_number.set_value
+          - target:
+              entity_id: input_number.prc_runoff_wort_calculated_volume_step09
+            data:
+              value: "{{ current_vol + (vol_per_step * 3) }}"
+            action: input_number.set_value
+          - target:
+              entity_id: input_number.prc_runoff_wort_calculated_volume_step10
+            data:
+              value: "{{ total_vol }}"
+            action: input_number.set_value
+      - conditions:
+          - condition: template
+            value_template: "{{ trigger.entity_id == 'input_boolean.prc_mashout_step08' }}"
+        sequence:
+          - action: system_log.write
+            data:
+              message: >-
+                Sparge Controller: Manual selection - Step 08 activated (Current
+                Volume: {{ states('sensor.prct_current_sparge_flow_volume') }}L)
+              level: info
+          - target:
+              entity_id:
+                - input_boolean.prc_mashout_step01
+                - input_boolean.prc_mashout_step02
+                - input_boolean.prc_mashout_step03
+                - input_boolean.prc_mashout_step04
+                - input_boolean.prc_mashout_step05
+                - input_boolean.prc_mashout_step06
+                - input_boolean.prc_mashout_step07
+                - input_boolean.prc_mashout_step09
+                - input_boolean.prc_mashout_step10
+            action: input_boolean.turn_off
+          - choose:
+              - conditions:
+                  - condition: state
+                    entity_id: input_boolean.prc_sparge_runoff
+                    state: "on"
+                sequence:
+                  - target:
+                      entity_id: input_number.hlt_speed
+                    data:
+                      value: >-
+                        {{
+                        states('input_number.prc_runoff_hlt_pump_speed_step08')
+                        }}
+                    action: input_number.set_value
+                  - target:
+                      entity_id: input_number.prc_wort_pump_speed
+                    data:
+                      value: >-
+                        {{
+                        states('input_number.prc_runoff_wort_pump_speed_step08')
+                        }}
+                    action: input_number.set_value
+                  - action: system_log.write
+                    data:
+                      message: >-
+                        Sparge Controller: Loaded pump speeds for Step 08 (HLT:
+                        {{
+                        states('input_number.prc_runoff_hlt_pump_speed_step08')
+                        }}, Wort: {{
+                        states('input_number.prc_runoff_wort_pump_speed_step08')
+                        }})
+                      level: info
+          - target:
+              entity_id: input_number.prc_mashout_current_step
+            data:
+              value: 8
+            action: input_number.set_value
+          - condition: template
+            value_template: >-
+              {{ states('sensor.prct_current_sparge_flow_volume') not in
+              ['unavailable', 'unknown'] }}
+          - variables:
+              total_vol: "{{ states('input_number.prc_wort_volume_required') | int(0) }}"
+              current_vol: "{{ states('sensor.prct_current_sparge_flow_volume') | int(0) }}"
+              steps_remaining: 3
+              vol_remaining: "{{ (total_vol - current_vol) | int(0) }}"
+          - condition: template
+            value_template: "{{ vol_remaining > 0 and total_vol <= 1300 }}"
+          - variables:
+              vol_per_step: "{{ (vol_remaining / steps_remaining) | int(0) }}"
+          - target:
+              entity_id: input_number.prc_runoff_wort_calculated_volume_step08
+            data:
+              value: "{{ current_vol + (vol_per_step * 1) }}"
+            action: input_number.set_value
+          - target:
+              entity_id: input_number.prc_runoff_wort_calculated_volume_step09
+            data:
+              value: "{{ current_vol + (vol_per_step * 2) }}"
+            action: input_number.set_value
+          - target:
+              entity_id: input_number.prc_runoff_wort_calculated_volume_step10
+            data:
+              value: "{{ total_vol }}"
+            action: input_number.set_value
+      - conditions:
+          - condition: template
+            value_template: "{{ trigger.entity_id == 'input_boolean.prc_mashout_step09' }}"
+        sequence:
+          - action: system_log.write
+            data:
+              message: >-
+                Sparge Controller: Manual selection - Step 09 activated (Current
+                Volume: {{ states('sensor.prct_current_sparge_flow_volume') }}L)
+              level: info
+          - target:
+              entity_id:
+                - input_boolean.prc_mashout_step01
+                - input_boolean.prc_mashout_step02
+                - input_boolean.prc_mashout_step03
+                - input_boolean.prc_mashout_step04
+                - input_boolean.prc_mashout_step05
+                - input_boolean.prc_mashout_step06
+                - input_boolean.prc_mashout_step07
+                - input_boolean.prc_mashout_step08
+                - input_boolean.prc_mashout_step10
+            action: input_boolean.turn_off
+          - choose:
+              - conditions:
+                  - condition: state
+                    entity_id: input_boolean.prc_sparge_runoff
+                    state: "on"
+                sequence:
+                  - target:
+                      entity_id: input_number.hlt_speed
+                    data:
+                      value: >-
+                        {{
+                        states('input_number.prc_runoff_hlt_pump_speed_step09')
+                        }}
+                    action: input_number.set_value
+                  - target:
+                      entity_id: input_number.prc_wort_pump_speed
+                    data:
+                      value: >-
+                        {{
+                        states('input_number.prc_runoff_wort_pump_speed_step09')
+                        }}
+                    action: input_number.set_value
+                  - action: system_log.write
+                    data:
+                      message: >-
+                        Sparge Controller: Loaded pump speeds for Step 09 (HLT:
+                        {{
+                        states('input_number.prc_runoff_hlt_pump_speed_step09')
+                        }}, Wort: {{
+                        states('input_number.prc_runoff_wort_pump_speed_step09')
+                        }})
+                      level: info
+          - target:
+              entity_id: input_number.prc_mashout_current_step
+            data:
+              value: 9
+            action: input_number.set_value
+          - condition: template
+            value_template: >-
+              {{ states('sensor.prct_current_sparge_flow_volume') not in
+              ['unavailable', 'unknown'] }}
+          - variables:
+              total_vol: "{{ states('input_number.prc_wort_volume_required') | int(0) }}"
+              current_vol: "{{ states('sensor.prct_current_sparge_flow_volume') | int(0) }}"
+              steps_remaining: 2
+              vol_remaining: "{{ (total_vol - current_vol) | int(0) }}"
+          - condition: template
+            value_template: "{{ vol_remaining > 0 and total_vol <= 1300 }}"
+          - variables:
+              vol_per_step: "{{ (vol_remaining / steps_remaining) | int(0) }}"
+          - target:
+              entity_id: input_number.prc_runoff_wort_calculated_volume_step09
+            data:
+              value: "{{ current_vol + (vol_per_step * 1) }}"
+            action: input_number.set_value
+          - target:
+              entity_id: input_number.prc_runoff_wort_calculated_volume_step10
+            data:
+              value: "{{ total_vol }}"
+            action: input_number.set_value
+      - conditions:
+          - condition: template
+            value_template: "{{ trigger.entity_id == 'input_boolean.prc_mashout_step10' }}"
+        sequence:
+          - action: system_log.write
+            data:
+              message: >-
+                Sparge Controller: Manual selection - Step 10 activated (Current
+                Volume: {{ states('sensor.prct_current_sparge_flow_volume') }}L)
+                - Final step
+              level: info
+          - target:
+              entity_id:
+                - input_boolean.prc_mashout_step01
+                - input_boolean.prc_mashout_step02
+                - input_boolean.prc_mashout_step03
+                - input_boolean.prc_mashout_step04
+                - input_boolean.prc_mashout_step05
+                - input_boolean.prc_mashout_step06
+                - input_boolean.prc_mashout_step07
+                - input_boolean.prc_mashout_step08
+                - input_boolean.prc_mashout_step09
+            action: input_boolean.turn_off
+          - choose:
+              - conditions:
+                  - condition: state
+                    entity_id: input_boolean.prc_sparge_runoff
+                    state: "on"
+                sequence:
+                  - target:
+                      entity_id: input_number.hlt_speed
+                    data:
+                      value: >-
+                        {{
+                        states('input_number.prc_runoff_hlt_pump_speed_step10')
+                        }}
+                    action: input_number.set_value
+                  - target:
+                      entity_id: input_number.prc_wort_pump_speed
+                    data:
+                      value: >-
+                        {{
+                        states('input_number.prc_runoff_wort_pump_speed_step10')
+                        }}
+                    action: input_number.set_value
+                  - action: system_log.write
+                    data:
+                      message: >-
+                        Sparge Controller: Loaded pump speeds for Step 10 (HLT:
+                        {{
+                        states('input_number.prc_runoff_hlt_pump_speed_step10')
+                        }}, Wort: {{
+                        states('input_number.prc_runoff_wort_pump_speed_step10')
+                        }})
+                      level: info
+          - target:
+              entity_id: input_number.prc_mashout_current_step
+            data:
+              value: 10
+            action: input_number.set_value
+          - target:
+              entity_id: input_number.prc_runoff_wort_calculated_volume_step10
+            data:
+              value: "{{ states('input_number.prc_wort_volume_required') | int(0) }}"
+            action: input_number.set_value
+mode: restart
