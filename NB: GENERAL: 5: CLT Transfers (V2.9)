@@ -1,0 +1,487 @@
+alias: "NB: GENERAL: 5: CLT Transfers (V2.9)"
+description: >
+  CLT to HLT/Kettle transfers with volume buttons and overflow safety
+
+  V2.9 - Added CLT auto-refill when tank goes empty during transfer
+
+  V2.8 - Moved volume button cleanup to execute immediately after pump stop
+  (instant UI)
+
+  V2.7 - Added volume button cleanup on completion/cancel
+
+  V2.6 - Added safety check to prevent transfer if current > target
+
+  V2.5 - Changed to absolute target volume (not additive)
+
+  V2.4 - Added 10L spindown compensation
+
+  V2.3 - Fixed target calculation (start + add)
+
+  V2.2 - Fixed trigger IDs for proper routing
+
+  V2.1 - Initial GOD MODE compliant version
+triggers:
+  - entity_id: input_boolean.prc_clt_volume_100
+    to: "on"
+    id: vol_100
+    trigger: state
+  - entity_id: input_boolean.prc_clt_volume_200
+    to: "on"
+    id: vol_200
+    trigger: state
+  - entity_id: input_boolean.prc_clt_volume_300
+    to: "on"
+    id: vol_300
+    trigger: state
+  - entity_id: input_boolean.prc_clt_volume_650
+    to: "on"
+    id: vol_650
+    trigger: state
+  - entity_id: input_boolean.prc_clt_volume_700
+    to: "on"
+    id: vol_700
+    trigger: state
+  - entity_id: input_boolean.prc_clt_volume_1000
+    to: "on"
+    id: vol_1000
+    trigger: state
+  - entity_id: input_boolean.prc_clt_volume_1100
+    to: "on"
+    id: vol_1100
+    trigger: state
+  - entity_id: input_boolean.prc_clt_volume_1200
+    to: "on"
+    id: vol_1200
+    trigger: state
+  - entity_id: input_boolean.prc_clt_to_hlt
+    to: "on"
+    id: hlt_start
+    trigger: state
+  - entity_id: input_boolean.prc_clt_to_hlt
+    to: "off"
+    id: hlt_stop
+    trigger: state
+  - entity_id: input_boolean.prc_clt_to_kettle
+    to: "on"
+    id: kettle_start
+    trigger: state
+  - entity_id: input_boolean.prc_clt_to_kettle
+    to: "off"
+    id: kettle_stop
+    trigger: state
+  - entity_id: sensor.cltt_global_fill_state_dny
+    to: EMPTY
+    id: clt_empty
+    trigger: state
+actions:
+  - choose:
+      - conditions:
+          - condition: trigger
+            id: vol_100
+        sequence:
+          - action: input_boolean.turn_off
+            target:
+              entity_id:
+                - input_boolean.prc_clt_volume_200
+                - input_boolean.prc_clt_volume_300
+                - input_boolean.prc_clt_volume_650
+                - input_boolean.prc_clt_volume_700
+                - input_boolean.prc_clt_volume_1000
+                - input_boolean.prc_clt_volume_1100
+                - input_boolean.prc_clt_volume_1200
+          - action: input_number.set_value
+            target:
+              entity_id: input_number.prc_clt_volume_to_add
+            data:
+              value: 100
+      - conditions:
+          - condition: trigger
+            id: vol_200
+        sequence:
+          - action: input_boolean.turn_off
+            target:
+              entity_id:
+                - input_boolean.prc_clt_volume_100
+                - input_boolean.prc_clt_volume_300
+                - input_boolean.prc_clt_volume_650
+                - input_boolean.prc_clt_volume_700
+                - input_boolean.prc_clt_volume_1000
+                - input_boolean.prc_clt_volume_1100
+                - input_boolean.prc_clt_volume_1200
+          - action: input_number.set_value
+            target:
+              entity_id: input_number.prc_clt_volume_to_add
+            data:
+              value: 200
+      - conditions:
+          - condition: trigger
+            id: vol_300
+        sequence:
+          - action: input_boolean.turn_off
+            target:
+              entity_id:
+                - input_boolean.prc_clt_volume_100
+                - input_boolean.prc_clt_volume_200
+                - input_boolean.prc_clt_volume_650
+                - input_boolean.prc_clt_volume_700
+                - input_boolean.prc_clt_volume_1000
+                - input_boolean.prc_clt_volume_1100
+                - input_boolean.prc_clt_volume_1200
+          - action: input_number.set_value
+            target:
+              entity_id: input_number.prc_clt_volume_to_add
+            data:
+              value: 300
+      - conditions:
+          - condition: trigger
+            id: vol_650
+        sequence:
+          - action: input_boolean.turn_off
+            target:
+              entity_id:
+                - input_boolean.prc_clt_volume_100
+                - input_boolean.prc_clt_volume_200
+                - input_boolean.prc_clt_volume_300
+                - input_boolean.prc_clt_volume_700
+                - input_boolean.prc_clt_volume_1000
+                - input_boolean.prc_clt_volume_1100
+                - input_boolean.prc_clt_volume_1200
+          - action: input_number.set_value
+            target:
+              entity_id: input_number.prc_clt_volume_to_add
+            data:
+              value: 650
+      - conditions:
+          - condition: trigger
+            id: vol_700
+        sequence:
+          - action: input_boolean.turn_off
+            target:
+              entity_id:
+                - input_boolean.prc_clt_volume_100
+                - input_boolean.prc_clt_volume_200
+                - input_boolean.prc_clt_volume_300
+                - input_boolean.prc_clt_volume_650
+                - input_boolean.prc_clt_volume_1000
+                - input_boolean.prc_clt_volume_1100
+                - input_boolean.prc_clt_volume_1200
+          - action: input_number.set_value
+            target:
+              entity_id: input_number.prc_clt_volume_to_add
+            data:
+              value: 700
+      - conditions:
+          - condition: trigger
+            id: vol_1000
+        sequence:
+          - action: input_boolean.turn_off
+            target:
+              entity_id:
+                - input_boolean.prc_clt_volume_100
+                - input_boolean.prc_clt_volume_200
+                - input_boolean.prc_clt_volume_300
+                - input_boolean.prc_clt_volume_650
+                - input_boolean.prc_clt_volume_700
+                - input_boolean.prc_clt_volume_1100
+                - input_boolean.prc_clt_volume_1200
+          - action: input_number.set_value
+            target:
+              entity_id: input_number.prc_clt_volume_to_add
+            data:
+              value: 1000
+      - conditions:
+          - condition: trigger
+            id: vol_1100
+        sequence:
+          - action: input_boolean.turn_off
+            target:
+              entity_id:
+                - input_boolean.prc_clt_volume_100
+                - input_boolean.prc_clt_volume_200
+                - input_boolean.prc_clt_volume_300
+                - input_boolean.prc_clt_volume_650
+                - input_boolean.prc_clt_volume_700
+                - input_boolean.prc_clt_volume_1000
+                - input_boolean.prc_clt_volume_1200
+          - action: input_number.set_value
+            target:
+              entity_id: input_number.prc_clt_volume_to_add
+            data:
+              value: 1100
+      - conditions:
+          - condition: trigger
+            id: vol_1200
+        sequence:
+          - action: input_boolean.turn_off
+            target:
+              entity_id:
+                - input_boolean.prc_clt_volume_100
+                - input_boolean.prc_clt_volume_200
+                - input_boolean.prc_clt_volume_300
+                - input_boolean.prc_clt_volume_650
+                - input_boolean.prc_clt_volume_700
+                - input_boolean.prc_clt_volume_1000
+                - input_boolean.prc_clt_volume_1100
+          - action: input_number.set_value
+            target:
+              entity_id: input_number.prc_clt_volume_to_add
+            data:
+              value: 1200
+      - conditions:
+          - condition: trigger
+            id: hlt_start
+        sequence:
+          - variables:
+              start_volume: "{{ states('sensor.prct_current_hlt_volume') | float(0) }}"
+              target_volume_setting: "{{ states('input_number.prc_clt_volume_to_add') | float(0) }}"
+              target_volume: "{{ target_volume_setting - 10 }}"
+          - if:
+              - condition: template
+                value_template: "{{ start_volume >= target_volume_setting }}"
+            then:
+              - action: system_log.write
+                data:
+                  message: >-
+                    CLT→HLT: ABORT - Current volume {{ start_volume }}L already
+                    >= target {{ target_volume_setting }}L
+                  level: error
+              - action: input_boolean.turn_off
+                target:
+                  entity_id: input_boolean.prc_clt_to_hlt
+              - stop: Current volume exceeds target
+          - action: system_log.write
+            data:
+              message: >-
+                CLT→HLT: Transfer started - target {{ target_volume_setting }}L
+                (stopping at {{ target_volume }}L for spindown)
+              level: warning
+          - action: input_boolean.turn_off
+            target:
+              entity_id: input_boolean.prc_clt_to_kettle
+          - action: pyscript.reset_all_valves
+          - delay:
+              seconds: "{{ states('input_number.prc_valve_transit_delay') | float(3) }}"
+          - action: pyscript.execute_process
+            data:
+              process_name: p008
+          - delay:
+              seconds: 3
+          - action: input_number.set_value
+            target:
+              entity_id: input_number.clt_speed
+            data:
+              value: 5000
+          - action: input_boolean.turn_on
+            target:
+              entity_id: input_boolean.clt_pump
+          - action: system_log.write
+            data:
+              message: "CLT→HLT: Pump started - waiting for {{ target_volume }}L"
+              level: warning
+          - wait_template: >-
+              {{ states('sensor.prct_current_hlt_volume') | float(0) >=
+              target_volume }}
+            timeout:
+              hours: 2
+            continue_on_timeout: true
+          - action: system_log.write
+            data:
+              message: "CLT→HLT: Target {{ target_volume }}L reached - stopping pump"
+              level: warning
+          - action: input_boolean.turn_off
+            target:
+              entity_id: input_boolean.clt_pump
+          - action: input_boolean.turn_off
+            target:
+              entity_id:
+                - input_boolean.prc_clt_volume_100
+                - input_boolean.prc_clt_volume_200
+                - input_boolean.prc_clt_volume_300
+                - input_boolean.prc_clt_volume_650
+                - input_boolean.prc_clt_volume_700
+                - input_boolean.prc_clt_volume_1000
+                - input_boolean.prc_clt_volume_1100
+                - input_boolean.prc_clt_volume_1200
+          - delay:
+              seconds: >-
+                {{ states('input_number.prc_clt_pump_spindown_duration') |
+                float(8) }}
+          - action: pyscript.reset_all_valves
+          - action: input_boolean.turn_off
+            target:
+              entity_id: input_boolean.prc_clt_to_hlt
+          - action: system_log.write
+            data:
+              message: "CLT→HLT: Transfer complete"
+              level: warning
+      - conditions:
+          - condition: trigger
+            id: hlt_stop
+        sequence:
+          - action: system_log.write
+            data:
+              message: "CLT→HLT: Manual cancel - emergency cleanup"
+              level: warning
+          - action: input_boolean.turn_off
+            target:
+              entity_id: input_boolean.clt_pump
+          - action: input_boolean.turn_off
+            target:
+              entity_id:
+                - input_boolean.prc_clt_volume_100
+                - input_boolean.prc_clt_volume_200
+                - input_boolean.prc_clt_volume_300
+                - input_boolean.prc_clt_volume_650
+                - input_boolean.prc_clt_volume_700
+                - input_boolean.prc_clt_volume_1000
+                - input_boolean.prc_clt_volume_1100
+                - input_boolean.prc_clt_volume_1200
+          - delay:
+              seconds: >-
+                {{ states('input_number.prc_clt_pump_spindown_duration') |
+                float(8) }}
+          - action: pyscript.reset_all_valves
+          - action: system_log.write
+            data:
+              message: "CLT→HLT: Emergency cleanup complete"
+              level: warning
+      - conditions:
+          - condition: trigger
+            id: kettle_start
+        sequence:
+          - variables:
+              start_volume: "{{ states('sensor.prct_current_kettle_volume') | float(0) }}"
+              target_volume_setting: "{{ states('input_number.prc_clt_volume_to_add') | float(0) }}"
+              target_volume: "{{ target_volume_setting - 10 }}"
+          - if:
+              - condition: template
+                value_template: "{{ start_volume >= target_volume_setting }}"
+            then:
+              - action: system_log.write
+                data:
+                  message: >-
+                    CLT→KETTLE: ABORT - Current volume {{ start_volume }}L
+                    already >= target {{ target_volume_setting }}L
+                  level: error
+              - action: input_boolean.turn_off
+                target:
+                  entity_id: input_boolean.prc_clt_to_kettle
+              - stop: Current volume exceeds target
+          - action: system_log.write
+            data:
+              message: >-
+                CLT→KETTLE: Transfer started - target {{ target_volume_setting
+                }}L (stopping at {{ target_volume }}L for spindown)
+              level: warning
+          - action: input_boolean.turn_off
+            target:
+              entity_id: input_boolean.prc_clt_to_hlt
+          - action: pyscript.reset_all_valves
+          - delay:
+              seconds: "{{ states('input_number.prc_valve_transit_delay') | float(3) }}"
+          - action: pyscript.execute_process
+            data:
+              process_name: p009
+          - delay:
+              seconds: 3
+          - action: input_number.set_value
+            target:
+              entity_id: input_number.clt_speed
+            data:
+              value: 5000
+          - action: input_boolean.turn_on
+            target:
+              entity_id: input_boolean.clt_pump
+          - action: system_log.write
+            data:
+              message: "CLT→KETTLE: Pump started - waiting for {{ target_volume }}L"
+              level: warning
+          - wait_template: >-
+              {{ states('sensor.prct_current_kettle_volume') | float(0) >=
+              target_volume }}
+            timeout:
+              hours: 2
+            continue_on_timeout: true
+          - action: system_log.write
+            data:
+              message: "CLT→KETTLE: Target {{ target_volume }}L reached - stopping pump"
+              level: warning
+          - action: input_boolean.turn_off
+            target:
+              entity_id: input_boolean.clt_pump
+          - action: input_boolean.turn_off
+            target:
+              entity_id:
+                - input_boolean.prc_clt_volume_100
+                - input_boolean.prc_clt_volume_200
+                - input_boolean.prc_clt_volume_300
+                - input_boolean.prc_clt_volume_650
+                - input_boolean.prc_clt_volume_700
+                - input_boolean.prc_clt_volume_1000
+                - input_boolean.prc_clt_volume_1100
+                - input_boolean.prc_clt_volume_1200
+          - delay:
+              seconds: >-
+                {{ states('input_number.prc_clt_pump_spindown_duration') |
+                float(8) }}
+          - action: pyscript.reset_all_valves
+          - action: input_boolean.turn_off
+            target:
+              entity_id: input_boolean.prc_clt_to_kettle
+          - action: system_log.write
+            data:
+              message: "CLT→KETTLE: Transfer complete"
+              level: warning
+      - conditions:
+          - condition: trigger
+            id: kettle_stop
+        sequence:
+          - action: system_log.write
+            data:
+              message: "CLT→KETTLE: Manual cancel - emergency cleanup"
+              level: warning
+          - action: input_boolean.turn_off
+            target:
+              entity_id: input_boolean.clt_pump
+          - action: input_boolean.turn_off
+            target:
+              entity_id:
+                - input_boolean.prc_clt_volume_100
+                - input_boolean.prc_clt_volume_200
+                - input_boolean.prc_clt_volume_300
+                - input_boolean.prc_clt_volume_650
+                - input_boolean.prc_clt_volume_700
+                - input_boolean.prc_clt_volume_1000
+                - input_boolean.prc_clt_volume_1100
+                - input_boolean.prc_clt_volume_1200
+          - delay:
+              seconds: >-
+                {{ states('input_number.prc_clt_pump_spindown_duration') |
+                float(8) }}
+          - action: pyscript.reset_all_valves
+          - action: system_log.write
+            data:
+              message: "CLT→KETTLE: Emergency cleanup complete"
+              level: warning
+      - conditions:
+          - condition: trigger
+            id: clt_empty
+          - condition: or
+            conditions:
+              - condition: state
+                entity_id: input_boolean.prc_clt_to_hlt
+                state: "on"
+              - condition: state
+                entity_id: input_boolean.prc_clt_to_kettle
+                state: "on"
+        sequence:
+          - action: system_log.write
+            data:
+              message: >-
+                CLT AUTO-REFILL: Tank empty during transfer - activating fill
+                solenoid
+              level: warning
+          - action: switch.turn_on
+            target:
+              entity_id: switch.cltt_fill_solenoid
+mode: restart
