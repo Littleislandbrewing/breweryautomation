@@ -1,0 +1,111 @@
+alias: "NB: WHIRLPOOL: Post-Whirlpool Runoff (V1.2 - KEPLER-107c)"
+description: >-
+  V1.2: GEMINI-CORRECTED. Added explicit timeout handling for kettle volume
+  wait.
+triggers:
+  - entity_id: input_boolean.prc_post_whirlpool_runoff
+    to: "on"
+    id: start
+    trigger: state
+  - entity_id: input_boolean.prc_post_whirlpool_runoff
+    to: "off"
+    id: stop
+    trigger: state
+  - entity_id: input_boolean.emergency
+    to: "on"
+    id: emergency
+    trigger: state
+conditions: []
+actions:
+  - choose:
+      - conditions:
+          - condition: trigger
+            id: start
+        sequence:
+          - action: system_log.write
+            data:
+              message: "POST-WHIRLPOOL RUNOFF: Start sequence initiated"
+              level: warning
+          - action: pyscript.execute_process
+            data:
+              process_name: p023
+          - action: system_log.write
+            data:
+              message: >-
+                POST-WHIRLPOOL RUNOFF: Valves configured (p023 side draw),
+                waiting 3s
+              level: warning
+          - delay:
+              seconds: 3
+          - action: input_number.set_value
+            target:
+              entity_id: input_number.prc_wort_pump_speed
+            data:
+              value: 5000
+          - action: system_log.write
+            data:
+              message: "POST-WHIRLPOOL RUNOFF: Wort pump speed set to 5000 RPM"
+              level: warning
+          - action: input_boolean.turn_on
+            target:
+              entity_id: input_boolean.prc_wort_pump
+          - action: input_boolean.turn_on
+            target:
+              entity_id: input_boolean.clt_pump
+          - action: system_log.write
+            data:
+              message: "POST-WHIRLPOOL RUNOFF: Pumps running, monitoring kettle volume"
+              level: warning
+          - wait_for_trigger:
+              - entity_id: sensor.prct_current_kettle_volume
+                below: 100
+                trigger: numeric_state
+            timeout:
+              hours: 2
+            continue_on_timeout: true
+          - if:
+              - condition: template
+                value_template: "{{ wait.trigger is none }}"
+            then:
+              - action: system_log.write
+                data:
+                  message: >-
+                    ⚠️ POST-WHIRLPOOL RUNOFF: 2hr timeout reached - stopping
+                    (kettle may not be empty)
+                  level: error
+            else:
+              - action: system_log.write
+                data:
+                  message: "POST-WHIRLPOOL RUNOFF: Kettle drained to ≤100L - stopping"
+                  level: warning
+          - action: input_boolean.turn_off
+            target:
+              entity_id: input_boolean.prc_post_whirlpool_runoff
+          - action: script.nb_0000_god_mode_system_shutdown_safe_reset
+          - action: system_log.write
+            data:
+              message: "POST-WHIRLPOOL RUNOFF: Auto-complete shutdown done"
+              level: warning
+      - conditions:
+          - condition: trigger
+            id: stop
+        sequence:
+          - action: system_log.write
+            data:
+              message: "POST-WHIRLPOOL RUNOFF: Manual stop triggered"
+              level: warning
+          - action: script.nb_0000_god_mode_system_shutdown_safe_reset
+          - action: system_log.write
+            data:
+              message: "POST-WHIRLPOOL RUNOFF: Manual stop complete"
+              level: warning
+      - conditions:
+          - condition: trigger
+            id: emergency
+        sequence:
+          - action: system_log.write
+            data:
+              message: "🚨 POST-WHIRLPOOL RUNOFF: EMERGENCY STOP - Calling GOD MODE"
+              level: error
+          - action: script.nb_0000_god_mode_system_shutdown_safe_reset
+mode: restart
